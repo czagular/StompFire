@@ -1,0 +1,2698 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StompFire: Wave Defense — Wilds Overhaul</title>
+    <style>
+        :root {
+            --bg: #7ecb5d;
+            --panel: rgba(17, 24, 20, 0.88);
+            --panel-2: rgba(10, 16, 12, 0.78);
+            --accent: #58a6ff;
+            --fire: #ff7b72;
+            --oxy: #7ee787;
+            --xp: #d2a8ff;
+            --tree: #3fb950;
+            --coin: #f2cc60;
+            --stamina: #79c0ff;
+            --danger: #ff6b6b;
+            --muted: #a5b0a9;
+            --edge: rgba(255,255,255,0.08);
+        }
+        * { box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; }
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: radial-gradient(circle at top, #8dd56a 0%, #70bc53 40%, #4c8839 100%);
+            color: #dce6dd;
+            overflow: hidden;
+        }
+        #stage { position: relative; width: 100vw; height: 100vh; overflow: hidden; cursor: crosshair; }
+        canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+        .hud-panel {
+            position: absolute; background: var(--panel); border: 1px solid var(--edge);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.35); backdrop-filter: blur(8px);
+            border-radius: 18px; color: #e7efe9; z-index: 20; overflow: hidden;
+        }
+        .hud-header {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            padding: 10px 12px; background: rgba(255,255,255,0.04);
+            border-bottom: 1px solid rgba(255,255,255,0.06); cursor: move; user-select: none;
+            font-size: 12px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.08em;
+        }
+        .hud-body { padding: 14px; }
+        #shop-panel { left: 18px; top: 18px; width: 370px; max-height: calc(100vh - 36px); display: flex; flex-direction: column; }
+        #shop-scroll { overflow-y: auto; max-height: calc(100vh - 104px); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+        #stats-panel { right: 18px; bottom: 18px; width: 350px; }
+        #compass-panel { left: 18px; top: 18px; width: 190px; display: none; }
+        #minimap-panel { right: 18px; top: 18px; width: 270px; display: none; }
+        #talent-panel { left: 404px; top: 18px; width: 320px; display: none; }
+        #wave-banner {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(7, 11, 9, 0.78); border: 2px solid rgba(88,166,255,0.55);
+            padding: 14px 18px; border-radius: 16px; text-align: center; z-index: 25;
+            min-width: 420px; box-shadow: 0 12px 30px rgba(0,0,0,0.25); backdrop-filter: blur(8px);
+        }
+        #wave-title { font-size: 24px; font-weight: 800; color: var(--accent); margin: 0; }
+        #wave-timer { font-size: 17px; margin-top: 6px; color: #d6f2df; }
+        #banner-actions { margin-top: 10px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+        .btn {
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #edf5ef;
+            padding: 10px 12px; border-radius: 10px; cursor: pointer; font-weight: 700; transition: 0.16s ease;
+        }
+        .btn:hover { transform: translateY(-1px); border-color: rgba(88,166,255,0.6); background: rgba(255,255,255,0.12); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+        .btn-primary { background: rgba(88,166,255,0.92); color: #08121f; border-color: transparent; }
+        .btn-primary:hover { background: rgba(100,175,255,1); }
+        .btn-active { outline: 2px solid rgba(242,204,96,0.6); }
+        .stat-card {
+            background: rgba(255,255,255,0.04); padding: 12px; border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.06); margin-bottom: 12px;
+        }
+        .label {
+            font-size: 12px; text-transform: uppercase; font-weight: 800; color: var(--muted);
+            display: flex; justify-content: space-between; gap: 8px; letter-spacing: 0.06em;
+        }
+        .progress-bar { width: 100%; height: 12px; background: rgba(0,0,0,0.35); border-radius: 999px; margin-top: 8px; overflow: hidden; border: 1px solid rgba(0,0,0,0.45); }
+        .progress-fill { height: 100%; width: 0%; transition: width 0.12s linear; }
+        .value-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .pill { background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 700; }
+        #shop { display: flex; flex-direction: column; gap: 10px; }
+        .shop-group-title, .talent-group-title {
+            font-size: 12px; text-transform: uppercase; color: var(--muted); font-weight: 800; letter-spacing: 0.06em; margin-top: 2px;
+        }
+        .shop-item, .talent-item {
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px;
+        }
+        .shop-item-top, .talent-item-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .mini { color: var(--muted); font-size: 11px; line-height: 1.45; }
+        #log { min-height: 160px; max-height: 210px; overflow-y: auto; display: flex; flex-direction: column-reverse; gap: 6px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); padding: 10px; }
+        .log-msg { padding: 6px 8px; border-radius: 6px; background: rgba(88,166,255,0.07); border-left: 3px solid var(--accent); font-size: 13px; }
+        .log-fire { border-left-color: var(--fire); color: #ffb3ae; }
+        .log-heal { border-left-color: var(--tree); color: #bdf0c6; }
+        .log-coin { border-left-color: var(--coin); color: #ffe7a1; }
+        .log-bad { border-left-color: var(--danger); color: #ffb3b3; }
+        .skill-wrap, .badge-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+        .skill-tag { padding: 5px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; border: 1px solid rgba(255,255,255,0.08); }
+        .skill-good { background: rgba(88,166,255,0.18); color: #c7e1ff; }
+        .skill-bad { background: rgba(255,107,107,0.14); color: #ffbcbc; }
+        .badge { padding: 5px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; border: 1px solid rgba(255,255,255,0.08); background: rgba(242,204,96,0.14); color: #ffeaaf; }
+        .overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.72); backdrop-filter: blur(5px); z-index: 30; padding: 20px; }
+        .chest-modal { width: min(460px, 95vw); background: rgba(17,24,20,0.96); border: 2px solid rgba(88,166,255,0.65); border-radius: 22px; padding: 28px; box-shadow: 0 16px 50px rgba(0,0,0,0.45); }
+        .bet-box { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 16px; margin: 16px 0; }
+        input[type="range"], input[type="number"] { width: 100%; }
+        input[type="number"] { margin-top: 8px; background: rgba(0,0,0,0.25); color: #fff; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px; }
+        #compass-wrap { position: relative; width: 100%; height: 130px; display: flex; align-items: center; justify-content: center; }
+        #compass-circle { width: 112px; height: 112px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.14); background: radial-gradient(circle, rgba(255,255,255,0.06), rgba(255,255,255,0.01)); position: relative; }
+        #compass-arrow, #wind-arrow {
+            position: absolute; left: 50%; top: 50%; width: 6px; height: 40px;
+            background: linear-gradient(to top, rgba(88,166,255,0.3), rgba(88,166,255,1));
+            transform-origin: center 34px; border-radius: 999px; margin-left: -3px; margin-top: -34px;
+        }
+        #compass-arrow::before, #wind-arrow::before {
+            content: ''; position: absolute; left: 50%; top: -10px; transform: translateX(-50%);
+            border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 18px solid rgba(88,166,255,1);
+        }
+        .hint-line { font-size: 11px; color: var(--muted); line-height: 1.45; margin-top: 6px; }
+        #damage-vignette, #night-vignette {
+            position: absolute; inset: 0; pointer-events: none; z-index: 26; opacity: 0; transition: opacity 0.08s linear;
+        }
+        #damage-vignette { background: radial-gradient(circle at center, rgba(255,120,80,0) 40%, rgba(255,90,60,0.12) 68%, rgba(120,0,0,0.55) 100%); mix-blend-mode: screen; }
+        #night-vignette { z-index: 19; background: radial-gradient(circle at center, rgba(20,30,50,0) 18%, rgba(10,15,30,0.14) 52%, rgba(4,8,18,0.62) 100%); }
+        #minimapCanvas { width: 100%; height: 220px; background: rgba(0,0,0,0.26); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); display: block; }
+        .legend-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+        .legend-cell { font-size: 11px; color: var(--muted); }
+
+        .chest-modal-wheel { max-width: 460px; }
+        .wheel-stage { position: relative; width: 240px; height: 240px; margin: 10px auto 18px; }
+        .fortune-wheel {
+            width: 240px; height: 240px; border-radius: 50%;
+            border: 8px solid rgba(255,255,255,0.16);
+            box-shadow: inset 0 0 0 3px rgba(0,0,0,0.22), 0 18px 40px rgba(0,0,0,0.28);
+            transition: transform 4.2s cubic-bezier(0.18, 0.9, 0.18, 1);
+            background: conic-gradient(
+                #58a6ff 0deg 32.727deg,
+                #7ee787 32.727deg 65.454deg,
+                #f2cc60 65.454deg 98.181deg,
+                #d2a8ff 98.181deg 130.908deg,
+                #ff7b72 130.908deg 163.635deg,
+                #a371f7 163.635deg 196.362deg,
+                #ff9e64 196.362deg 229.089deg,
+                #50fa7b 229.089deg 261.816deg,
+                #f2cc60 261.816deg 294.543deg,
+                #ff6b6b 294.543deg 327.27deg,
+                #58a6ff 327.27deg 360deg
+            );
+            position: relative;
+            overflow: hidden;
+        }
+        .fortune-wheel::after {
+            content: 'OSUD'; position:absolute; inset:50% auto auto 50%; transform:translate(-50%,-50%);
+            width: 74px; height: 74px; border-radius: 50%;
+            display:flex; align-items:center; justify-content:center;
+            background: rgba(7,11,9,0.92); border: 3px solid rgba(255,255,255,0.16);
+            color: #eef6f0; font-weight: 800; letter-spacing: 0.12em; font-size: 12px;
+        }
+        .wheel-pointer {
+            position:absolute; left:50%; top:-6px; transform:translateX(-50%);
+            width:0; height:0; z-index:2;
+            border-left:16px solid transparent; border-right:16px solid transparent; border-top:0;
+            border-bottom:28px solid #f2cc60; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.35));
+        }
+        .map-caption { font-size: 11px; color: var(--muted); margin-top: 10px; line-height: 1.45; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+<main id="stage">
+    <div id="wave-banner">
+        <div id="wave-title">WAVE 1</div>
+        <div id="wave-timer"></div>
+        <div id="banner-actions">
+            <button id="skip-btn" class="btn btn-primary">Skip cooldown</button>
+            <button id="toggle-minimap-btn" class="btn">M = mapa</button>
+            <button id="toggle-talent-btn" class="btn">T = talenty</button>
+            <button class="btn" disabled>F = firebreak</button>
+        </div>
+    </div>
+
+    <section id="shop-panel" class="hud-panel">
+        <div class="hud-header" data-drag-handle>
+            <span>Shop & base</span>
+            <span class="mini">drag</span>
+        </div>
+        <div id="shop-scroll">
+            <div class="stat-card">
+                <div class="label"><span>Base</span><span id="base-state">U stromu</span></div>
+                <div class="mini">Shop je dostupný jen poblíž středu. Když odejdeš, panel zmizí a vlevo nahoře se ukáže kompas.</div>
+            </div>
+            <div class="stat-card">
+                <div class="label"><span>Coins & fires</span><span id="coin-text">0</span></div>
+                <div class="value-row">
+                    <div class="pill">🪙 Coins: <span id="coin-text-2">0</span></div>
+                    <div class="pill">🎯 Goal: <span id="fire-count">0/1</span></div>
+                    <div class="pill">🌿 Keře: <span id="bush-count">0</span></div>
+                    <div class="pill">🦊 Zvířata: <span id="animal-count">0</span></div>
+                </div>
+            </div>
+            <div id="shop"></div>
+            <div id="log"></div>
+        </div>
+    </section>
+
+    <section id="compass-panel" class="hud-panel">
+        <div class="hud-header" data-drag-handle>
+            <span>Compass</span>
+            <span class="mini">to center</span>
+        </div>
+        <div class="hud-body">
+            <div id="compass-wrap">
+                <div id="compass-circle"></div>
+                <div id="compass-arrow"></div>
+            </div>
+            <div class="hint-line">Kompas ukazuje směr ke stromu a shopu u středu mapy.</div>
+            <div class="hint-line">Vzdálenost: <span id="center-distance">0</span></div>
+        </div>
+    </section>
+
+    <section id="minimap-panel" class="hud-panel">
+        <div class="hud-header" data-drag-handle>
+            <span>Minimapa</span>
+            <span class="mini">drag</span>
+        </div>
+        <div class="hud-body">
+            <canvas id="minimapCanvas" width="240" height="220"></canvas>
+            <div class="legend-grid">
+                <div class="legend-cell">🟢 střed</div>
+                <div class="legend-cell">🔥 oheň</div>
+                <div class="legend-cell">🟣 mega fire</div>
+                <div class="legend-cell">🟡 slon</div>
+                <div class="legend-cell">⚪ zvíře</div>
+                <div class="legend-cell">🟦 firebreak</div>
+            </div>
+        </div>
+    </section>
+
+    <section id="talent-panel" class="hud-panel">
+        <div class="hud-header" data-drag-handle>
+            <span>Talents</span>
+            <span class="mini">T = show</span>
+        </div>
+        <div class="hud-body">
+            <div class="stat-card">
+                <div class="label"><span>Body talentů</span><span id="talent-points">0</span></div>
+                <div class="mini">Každé 3 levely získáš 1 bod. Talenty zásadně mění build slona.</div>
+            </div>
+            <div id="talent-list"></div>
+        </div>
+    </section>
+
+    <section id="stats-panel" class="hud-panel">
+        <div class="hud-header" data-drag-handle>
+            <span>Stats</span>
+            <span class="mini">drag</span>
+        </div>
+        <div class="hud-body">
+            <div class="stat-card">
+                <div class="label">Lungs (oxygen) <span id="oxy-text">100 / 100</span></div>
+                <div class="progress-bar"><div id="oxy-fill" class="progress-fill" style="background: var(--oxy); width:100%"></div></div>
+                <div class="mini" id="drain-info"></div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Stamina <span id="stamina-text">100 / 100</span></div>
+                <div class="progress-bar"><div id="stamina-fill" class="progress-fill" style="background: var(--stamina); width:100%"></div></div>
+                <div class="hint-line">WASD/šipky = pohyb • Shift = sprint • Space = stomp • H = skip • M = mapa • T = talenty • F = firebreak</div>
+                <div class="hint-line">Rychlost: <span id="speed-readout">0</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="label"><span>Level <span id="lvl-val">1</span></span><span id="xp-text">0 / 500</span></div>
+                <div class="progress-bar"><div id="xp-fill" class="progress-fill" style="background: var(--xp)"></div></div>
+                <div class="value-row">
+                    <div class="pill">🦶 Radius: <span id="radius-readout">0</span></div>
+                    <div class="pill">🏃 Base: <span id="base-speed-readout">0</span></div>
+                    <div class="pill">⚡ Sprint: <span id="sprint-readout">x1</span></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="label"><span>Environment</span><span id="day-readout">Day</span></div>
+                <div class="value-row">
+                    <div class="pill">🌬️ Vítr: <span id="wind-readout">0°</span></div>
+                    <div class="pill">💨 Síla: <span id="wind-strength-readout">0</span></div>
+                    <div class="pill">🌍 Biome: <span id="biome-readout">louka</span></div>
+                    <div class="pill">🧱 Breaks: <span id="firebreak-readout">0</span></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Active skills & debuffs</div>
+                <div id="active-skills" class="skill-wrap"></div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Achievements</div>
+                <div id="achievement-list" class="badge-wrap"></div>
+            </div>
+        </div>
+    </section>
+
+    <canvas id="gameCanvas"></canvas>
+    <div id="night-vignette"></div>
+    <div id="damage-vignette"></div>
+
+    <div id="overlay-chest" class="overlay">
+        <div class="chest-modal chest-modal-wheel">
+            <h2 style="margin-top:0; color:var(--xp)">🎡 Kolo osudu</h2>
+            <p>Kolo je zdarma a umí se roztočit samo. Může přinést ability, prokletí, výhru coinů i ztrátu coinů.</p>
+            <div class="wheel-stage">
+                <div class="wheel-pointer"></div>
+                <div id="fortune-wheel" class="fortune-wheel"></div>
+            </div>
+            <div class="card" style="margin-bottom:14px;">
+                <div class="label"><span>Režim</span><span>Autopilot</span></div>
+                <div class="hint-line">Další automatický spin probíhá během hry sám. Klikni na tlačítko nebo stiskni mezerník.</div>
+                <div class="hint-line">Poslední výsledek: <span id="wheel-last-result">Čeká na první spin</span></div>
+            </div>
+            <button id="roll-chest-btn" class="btn btn-primary" style="width:100%; padding:14px;">Roztočit zdarma / mezerník</button>
+        </div>
+    </div>
+</main>
+
+<script>
+const DATA = {
+    hexSize: 42,
+    baseXp: 500,
+    xpPerKill: 100,
+    coinsPerKill: 14,
+    oxyPerKill: 5,
+
+    cooldownTime: 20,
+    stompCooldown: 0.2,
+    stompBaseRadius: 58,
+    stompRadiusPerStack: 26,
+    stompMegaDamage: 22,
+
+    treeRadius: 95,
+    healAuraRadius: 165,
+    shopAuraRadius: 210,
+    treeHealPerSecond: 18,
+
+    acceleration: 2200,
+    braking: 10.5,
+    baseMoveSpeed: 280,
+    sprintMultiplier: 1.75,
+    maxStamina: 100,
+    staminaDrain: 18,
+    staminaRegen: 28,
+
+    renderTileRadius: 10,
+    cameraLerp: 0.12,
+    isoScaleX: 1.0,
+    isoScaleY: 0.52,
+    horizonLift: 120,
+
+    bushSpawnBase: 14,
+    bushSpawnPerWave: 3,
+    bushFireChance: 0.36,
+    fireSpreadRateBase: 3200,
+    fireSpreadWaveAcceleration: 95,
+    openingFireRatio: 0.45,
+    activeFireCapBase: 8,
+    activeFireCapPerWave: 0.5,
+    activeFireBonusVsTarget: 2,
+
+    fireDangerRadius: 2040,
+    fireDangerCap: 6,
+    fireInfluenceFalloffRadius: 340,
+    fireInfluenceMin: 0.2,
+    waveFireBaseDamage: 4.8,
+    waveFireDamageStepDown: 0.7,
+    waveDrainCap: 14,
+    waveDrainMultiplier: 1.0,
+
+    burningBushTouchRadius: 120,
+    burningBushTouchDamagePerSecond: 2.4,
+    cooldownBurnDamageMultiplier: 5.0,
+
+    waveStartVignetteTime: 1.0,
+    waveStartVignetteStrength: 0.65,
+    burnVignetteStrength: 0.9,
+
+    windChangeInterval: 26,
+    windStrengthMin: 0.25,
+    windStrengthMax: 1.0,
+    windSpreadMultiplier: 0.85,
+    windSmokeMultiplier: 0.9,
+
+    megaFireStartWave: 4,
+    megaFireWaveEvery: 4,
+    megaFireRadius: 70,
+    megaFireHpBase: 70,
+    megaFireHpPerWave: 10,
+    megaFireSpawnFireInterval: 2.4,
+    megaFireRewardXp: 550,
+    megaFireRewardCoins: 95,
+    megaFireWaveProgressReward: 4,
+
+    animalSpawnBase: 1,
+    animalSpawnPerFiveWaves: 1,
+    animalRescueRadius: 44,
+    animalBaseDeliverRadius: 120,
+    animalFireFearRadius: 220,
+    animalRewardCoins: 28,
+    animalRewardXp: 110,
+
+    firebreakBaseCharges: 1,
+    firebreakDuration: 7,
+    firebreakRadius: 34,
+    firebreakLength: 200,
+    firebreakCostStamina: 20,
+
+    smokeSpawnRate: 0.09,
+    smokeLifeMin: 2.2,
+    smokeLifeMax: 4.2,
+    smokeDamagePerSecond: 1.4,
+    smokePlayerRadius: 42,
+
+    dayNightSeconds: 90,
+    dayNightNightBonusDrain: 1.18,
+    dayNightDayBonusSpread: 1.12,
+
+    talentEveryLevels: 3,
+    minimapRadius: 520,
+    maxSmokeClouds: 34,
+    maxSmokeRender: 18,
+    maxParticles: 44,
+    autoWheelInterval: 15,
+    maxTrackedBurningTiles: 80,
+};
+
+const SKILLS = [
+    { id: 'double_stomp', name: 'Zemětřesení', desc: 'Zvětšuje radius stompu.', icon: '🦶', good: true },
+    { id: 'scrubber', name: 'Odsávač', desc: 'Snižuje drain kyslíku.', icon: '🌪️', good: true },
+    { id: 'dash', name: 'Rychlé nohy', desc: 'Lepší sprint a víc staminy.', icon: '🏃', good: true },
+    { id: 'lung_capacity', name: 'Velké plíce', desc: 'Vyšší maximum kyslíku.', icon: '🫁', good: true },
+    { id: 'fragile_lungs', name: 'Křehké plíce', desc: 'Nižší max kyslík.', icon: '💀', good: false },
+    { id: 'heavy_legs', name: 'Těžké nohy', desc: 'Pomalejší pohyb a horší sprint.', icon: '🪨', good: false },
+    { id: 'smoke_lungs', name: 'Zakouřené plíce', desc: 'Vyšší drain kyslíku.', icon: '☠️', good: false }
+];
+
+const SKIN_SHOP = [
+    { id: 'classic', name: 'Classic', cost: 0, body: '#8b949e', ear: '#6e7681', accent: '#d7dde4' },
+    { id: 'ember', name: 'Ember', cost: 120, body: '#cf6a32', ear: '#9f431a', accent: '#ffd089' },
+    { id: 'forest', name: 'Forest', cost: 160, body: '#6aa17e', ear: '#3e7151', accent: '#d9ffd9' },
+    { id: 'void', name: 'Void', cost: 240, body: '#7d5cff', ear: '#4a38a6', accent: '#ebddff' }
+];
+
+const UPGRADE_SHOP = [
+    { id: 'double_stomp', name: 'Upgrade: Zemětřesení', desc: '+ radius stompu', baseCost: 90 },
+    { id: 'scrubber', name: 'Upgrade: Odsávač', desc: '- drain kyslíku', baseCost: 95 },
+    { id: 'dash', name: 'Upgrade: Sprint', desc: '+ sprint a stamina', baseCost: 100 },
+    { id: 'lung_capacity', name: 'Upgrade: Plíce', desc: '+ max kyslík', baseCost: 85 }
+];
+
+const CHEST_POOL = [
+    { id: 'double_stomp', weight: 18 },
+    { id: 'scrubber', weight: 18 },
+    { id: 'dash', weight: 18 },
+    { id: 'lung_capacity', weight: 18 },
+    { id: 'fragile_lungs', weight: 10 },
+    { id: 'heavy_legs', weight: 9 },
+    { id: 'smoke_lungs', weight: 9 }
+];
+
+const FATE_WHEEL = [
+    { type: 'skill', id: 'double_stomp', amount: 1, weight: 15, label: '🦶 Zemětřesení +1', good: true },
+    { type: 'skill', id: 'scrubber', amount: 1, weight: 15, label: '🌪️ Odsávač +1', good: true },
+    { type: 'skill', id: 'dash', amount: 1, weight: 14, label: '🏃 Sprint +1', good: true },
+    { type: 'skill', id: 'lung_capacity', amount: 1, weight: 14, label: '🫁 Velké plíce +1', good: true },
+    { type: 'skill', id: 'fragile_lungs', amount: 1, weight: 9, label: '💀 Křehké plíce +1', good: false },
+    { type: 'skill', id: 'heavy_legs', amount: 1, weight: 8, label: '🪨 Těžké nohy +1', good: false },
+    { type: 'skill', id: 'smoke_lungs', amount: 1, weight: 8, label: '☠️ Zakouřené plíce +1', good: false },
+    { type: 'coins', amount: 30, weight: 9, label: '🪙 +30 coinů', good: true },
+    { type: 'coins', amount: 60, weight: 6, label: '💰 +60 coinů', good: true },
+    { type: 'coins', amount: -20, weight: 6, label: '🫳 -20 coinů', good: false },
+    { type: 'coins', amount: -45, weight: 4, label: '💸 -45 coinů', good: false }
+];
+
+const TALENTS = [
+    { id: 'bulldozer', name: 'Bulldozer', icon: '🛡️', desc: 'Větší stomp, víc damage do MegaFire.', color: '#ffd089' },
+    { id: 'sprinter', name: 'Sprinter', icon: '⚡', desc: 'Vyšší rychlost, lepší sprint a rescue.', color: '#9fd6ff' },
+    { id: 'firebreaker', name: 'Firebreaker', icon: '🧱', desc: 'Více charge pro firebreak, delší trvání, menší kouř.', color: '#d8c0ff' },
+];
+
+const ANIMAL_TYPES = [
+    { id: 'rabbit', icon: '🐇', speed: 120 },
+    { id: 'deer', icon: '🦌', speed: 95 },
+    { id: 'fox', icon: '🦊', speed: 105 },
+];
+
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function rand(a, b) { return a + Math.random() * (b - a); }
+
+class StompGame {
+    constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.minimapCanvas = document.getElementById('minimapCanvas');
+        this.minimapCtx = this.minimapCanvas.getContext('2d');
+        this.tiles = new Map();
+        this.particles = [];
+        this.rings = [];
+        this.camera = { x: 0, y: 0 };
+        this.fx = { waveFlash: 0, burnFlash: 0 };
+        this.totalTime = 0;
+
+        this.wind = { angle: Math.random() * Math.PI * 2, strength: 0.45, timer: DATA.windChangeInterval };
+        this.megaFires = [];
+        this.animals = [];
+        this.firebreaks = [];
+        this.smokeClouds = [];
+
+        this.achievements = {
+            quenched: 0,
+            rescued: 0,
+            megasKilled: 0,
+            firebreaksPlaced: 0,
+            wavesCleared: 0,
+            animalsLost: 0
+        };
+
+        this.spec = { points: 0, levelsClaimed: 0, tree: { bulldozer: 0, sprinter: 0, firebreaker: 0 } };
+
+        this.player = {
+            x: -240, y: 0, vx: 0, vy: 0,
+            xp: 0, lvl: 1, nextXp: DATA.baseXp, coins: 0,
+            oxy: 100, maxOxy: 100, stamina: DATA.maxStamina, maxStamina: DATA.maxStamina,
+            skills: {}, ownedSkins: new Set(['classic']), equippedSkin: 'classic', sprinting: false
+        };
+
+        this.wave = 1;
+        this.gameState = 'COOLDOWN';
+        this.timer = DATA.cooldownTime;
+        this.lastSpawn = 0;
+        this.lastStompAt = 0;
+        this.paused = false;
+        this.pendingChest = false;
+        this.activeBurningTiles = [];
+        this.fateWheel = { timer: DATA.autoWheelInterval, lastResult: 'Čeká na první spin' };
+        this.input = { up: false, down: false, left: false, right: false, sprint: false };
+        this.ui = { minimapOpen: false, talentOpen: false };
+
+        this.init();
+    }
+
+    init() {
+        window.addEventListener('resize', () => this.resize());
+        this.resize();
+        this.setupInput();
+        this.setupUI();
+        this.randomizeWind(true);
+        this.updateDerivedStats();
+        this.ensureTerrainAround(this.player.x, this.player.y, DATA.renderTileRadius + 4);
+        this.renderShop();
+        this.renderTalentPanel();
+        this.updateUI();
+        this.loop();
+        this.log('Overhaul aktivní: vítr, MegaFire, zvířata, firebreak, minimapa, biomy a talent tree.', 'heal');
+    }
+
+    resize() {
+        this.canvas.width = this.canvas.offsetWidth;
+        this.canvas.height = this.canvas.offsetHeight;
+    }
+
+    setupUI() {
+        document.getElementById('skip-btn').addEventListener('click', () => this.trySkipCooldown());
+        document.getElementById('toggle-minimap-btn').addEventListener('click', () => this.toggleMinimap());
+        document.getElementById('toggle-talent-btn').addEventListener('click', () => this.toggleTalentPanel());
+
+        document.getElementById('roll-chest-btn').addEventListener('click', () => this.spinFateWheel(true));
+
+        ['shop-panel', 'stats-panel', 'compass-panel', 'minimap-panel', 'talent-panel'].forEach(id => {
+            this.makePanelDraggable(document.getElementById(id));
+        });
+    }
+
+    makePanelDraggable(panel) {
+        const handle = panel.querySelector('[data-drag-handle]');
+        let dragging = false;
+        let startX = 0, startY = 0, originX = 0, originY = 0;
+
+        const down = (e) => {
+            dragging = true;
+            const rect = panel.getBoundingClientRect();
+            panel.style.right = 'auto';
+            panel.style.bottom = 'auto';
+            panel.style.left = rect.left + 'px';
+            panel.style.top = rect.top + 'px';
+            startX = e.clientX; startY = e.clientY;
+            originX = rect.left; originY = rect.top;
+            e.preventDefault();
+        };
+        const move = (e) => {
+            if (!dragging) return;
+            const x = originX + (e.clientX - startX);
+            const y = originY + (e.clientY - startY);
+            panel.style.left = clamp(x, 8, window.innerWidth - panel.offsetWidth - 8) + 'px';
+            panel.style.top = clamp(y, 8, window.innerHeight - panel.offsetHeight - 8) + 'px';
+        };
+        const up = () => dragging = false;
+        handle.addEventListener('mousedown', down);
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', up);
+    }
+
+    setupInput() {
+        window.addEventListener('keydown', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'w' || k === 'arrowup') this.input.up = true;
+            if (k === 's' || k === 'arrowdown') this.input.down = true;
+            if (k === 'a' || k === 'arrowleft') this.input.left = true;
+            if (k === 'd' || k === 'arrowright') this.input.right = true;
+            if (k === 'shift') this.input.sprint = true;
+            if (k === 'h') this.trySkipCooldown();
+            if (k === 'm') this.toggleMinimap();
+            if (k === 't') this.toggleTalentPanel();
+            if (k === 'f') this.tryPlaceFirebreak();
+            if (k === ' ') {
+                e.preventDefault();
+                const chestOpen = document.getElementById('overlay-chest')?.style.display === 'flex';
+                if (chestOpen) {
+                    this.spinFateWheel(true);
+                } else if (!this.paused) {
+                    this.tryStomp();
+                }
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'w' || k === 'arrowup') this.input.up = false;
+            if (k === 's' || k === 'arrowdown') this.input.down = false;
+            if (k === 'a' || k === 'arrowleft') this.input.left = false;
+            if (k === 'd' || k === 'arrowright') this.input.right = false;
+            if (k === 'shift') this.input.sprint = false;
+        });
+    }
+
+    toggleMinimap() {
+        this.ui.minimapOpen = !this.ui.minimapOpen;
+        document.getElementById('minimap-panel').style.display = this.ui.minimapOpen ? 'block' : 'none';
+        document.getElementById('toggle-minimap-btn').classList.toggle('btn-active', this.ui.minimapOpen);
+    }
+
+    toggleTalentPanel() {
+        this.ui.talentOpen = !this.ui.talentOpen;
+        document.getElementById('talent-panel').style.display = this.ui.talentOpen ? 'block' : 'none';
+        document.getElementById('toggle-talent-btn').classList.toggle('btn-active', this.ui.talentOpen);
+    }
+
+    trySkipCooldown() {
+        if (this.gameState === 'COOLDOWN' && !this.paused) {
+            this.timer = 0;
+            this.log('Cooldown přeskočen. Hned startuje další vlna.', 'coin');
+        }
+    }
+
+    tileKey(q, r) { return `${q},${r}`; }
+
+    worldToAxial(x, y) {
+        const q = (Math.sqrt(3)/3 * x - 1/3 * y) / DATA.hexSize;
+        const r = (2/3 * y) / DATA.hexSize;
+        return this.hexRound(q, r);
+    }
+
+    hexRound(q, r) {
+        let x = q, z = r, y = -x - z;
+        let rx = Math.round(x), ry = Math.round(y), rz = Math.round(z);
+        const xDiff = Math.abs(rx - x), yDiff = Math.abs(ry - y), zDiff = Math.abs(rz - z);
+        if (xDiff > yDiff && xDiff > zDiff) rx = -ry - rz;
+        else if (yDiff > zDiff) ry = -rx - rz;
+        else rz = -rx - ry;
+        return { q: rx, r: rz };
+    }
+
+    axialToWorld(q, r) {
+        return { x: DATA.hexSize * (Math.sqrt(3) * q + Math.sqrt(3)/2 * r), y: DATA.hexSize * (3/2 * r) };
+    }
+
+    noise(q, r) {
+        const n = Math.sin(q * 127.1 + r * 311.7) * 43758.5453123;
+        return n - Math.floor(n);
+    }
+
+    biomeAt(q, r) {
+        const b = this.noise(Math.floor(q * 0.26), Math.floor(r * 0.26));
+        if (b < 0.22) return 'meadow';
+        if (b < 0.48) return 'forest';
+        if (b < 0.73) return 'steppe';
+        return 'marsh';
+    }
+
+    getDayPhaseInfo() {
+        const cycle = (this.totalTime % DATA.dayNightSeconds) / DATA.dayNightSeconds;
+        if (cycle < 0.25) return { label: 'Day', darkness: 0.0 };
+        if (cycle < 0.5) return { label: 'Dusk', darkness: 0.25 };
+        if (cycle < 0.75) return { label: 'Night', darkness: 0.52 };
+        return { label: 'Dawn', darkness: 0.18 };
+    }
+
+    ensureTerrainAround(wx, wy, radius) {
+        const center = this.worldToAxial(wx, wy);
+        for (let dq = -radius; dq <= radius; dq++) {
+            for (let dr = -radius; dr <= radius; dr++) {
+                const q = center.q + dq, r = center.r + dr;
+                const dist = Math.max(Math.abs(dq), Math.abs(dr), Math.abs(-dq-dr));
+                if (dist > radius) continue;
+                this.ensureTile(q, r);
+            }
+        }
+    }
+
+    ensureTile(q, r) {
+        const key = this.tileKey(q, r);
+        if (this.tiles.has(key)) return this.tiles.get(key);
+        const pos = this.axialToWorld(q, r);
+        const centerDist = Math.hypot(pos.x, pos.y);
+        const treeCoords = new Set(['0,0','1,0','-1,0','0,1','0,-1','1,-1','-1,1']);
+        const isTree = treeCoords.has(key);
+        const n = this.noise(q, r);
+        const n2 = this.noise(q * 3 + 19, r * 3 - 41);
+        const biome = this.biomeAt(q, r);
+
+        let type = 'grass';
+        if (isTree) type = 'tree';
+        else if (centerDist > DATA.treeRadius + 80 && (biome === 'forest' ? n > 0.72 : biome === 'steppe' ? n > 0.89 : biome === 'marsh' ? n > 0.84 : n > 0.82)) type = 'bush';
+        else if (n < 0.08) type = 'grass2';
+        else if (n2 > 0.92) type = 'flowers';
+
+        const tile = {
+            q, r, x: pos.x, y: pos.y, type, biome,
+            fire: 0, scorch: 0, burnTime: 0, bushHealth: type === 'bush' ? 1 : 0, generatedInWave: 0
+        };
+        this.tiles.set(key, tile);
+        return tile;
+    }
+
+    getSkillCount(id) { return this.player.skills[id] || 0; }
+
+    addSkill(id, amount = 1) {
+        if (!this.player.skills[id]) this.player.skills[id] = 0;
+        this.player.skills[id] += amount;
+        this.updateDerivedStats();
+        this.renderTalentPanel();
+        this.updateUI();
+    }
+
+    getTalentLevel(id) { return this.spec.tree[id] || 0; }
+
+    buyTalent(id) {
+        if (this.spec.points <= 0) return;
+        this.spec.tree[id] = (this.spec.tree[id] || 0) + 1;
+        this.spec.points--;
+        this.updateDerivedStats();
+        this.renderTalentPanel();
+        this.updateUI();
+        this.log(`Talent aktivní: ${TALENTS.find(t => t.id === id).name} lvl ${this.spec.tree[id]}`, 'coin');
+    }
+
+    renderTalentPanel() {
+        const wrap = document.getElementById('talent-list');
+        document.getElementById('talent-points').innerText = this.spec.points;
+        wrap.innerHTML = '';
+        TALENTS.forEach(t => {
+            const lvl = this.getTalentLevel(t.id);
+            const card = document.createElement('div');
+            card.className = 'talent-item';
+            card.innerHTML = `<div class="talent-item-top"><strong>${t.icon} ${t.name}</strong><span class="mini">Lvl ${lvl}</span></div><small class="mini">${t.desc}</small>`;
+            const btn = document.createElement('button');
+            btn.className = 'btn';
+            btn.textContent = this.spec.points > 0 ? 'Investovat bod' : 'Bez bodů';
+            btn.disabled = this.spec.points <= 0;
+            btn.onclick = () => this.buyTalent(t.id);
+            card.appendChild(btn);
+            wrap.appendChild(card);
+        });
+    }
+
+    updateDerivedStats() {
+        const lung = this.getSkillCount('lung_capacity');
+        const dash = this.getSkillCount('dash');
+        const scrubber = this.getSkillCount('scrubber');
+        const stomp = this.getSkillCount('double_stomp');
+        const fragile = this.getSkillCount('fragile_lungs');
+        const heavy = this.getSkillCount('heavy_legs');
+        const smoke = this.getSkillCount('smoke_lungs');
+        const bulldozer = this.getTalentLevel('bulldozer');
+        const sprinter = this.getTalentLevel('sprinter');
+        const firebreaker = this.getTalentLevel('firebreaker');
+
+        this.derived = {
+            stompRadius: DATA.stompBaseRadius + stomp * DATA.stompRadiusPerStack + bulldozer * 24,
+            baseMoveSpeed: Math.max(120, DATA.baseMoveSpeed + dash * 34 - heavy * 28 + sprinter * 30),
+            sprintMultiplier: Math.max(1.05, DATA.sprintMultiplier + dash * 0.16 - heavy * 0.10 + sprinter * 0.12),
+            maxOxy: Math.max(35, 100 + lung * 20 - fragile * 16),
+            maxStamina: Math.max(35, DATA.maxStamina + dash * 20 - heavy * 14 + sprinter * 12),
+            staminaDrain: Math.max(8, DATA.staminaDrain + heavy * 2.2 - dash * 1.3 - sprinter * 0.8),
+            staminaRegen: Math.max(8, DATA.staminaRegen + dash * 1.8 - heavy * 1.2 + sprinter * 1.4),
+            scrubberFactor: Math.pow(0.75, scrubber) * Math.pow(0.92, firebreaker),
+            smokeFactor: Math.pow(1.16, smoke),
+            megaDamageMultiplier: 1 + bulldozer * 0.35,
+            firebreakChargesMax: DATA.firebreakBaseCharges + firebreaker,
+            firebreakDuration: DATA.firebreakDuration + firebreaker * 2.4,
+            firebreakLength: DATA.firebreakLength + firebreaker * 32,
+            rescueMoveBonus: 1 + sprinter * 0.06,
+        };
+
+        const oxyRatio = this.player.maxOxy > 0 ? this.player.oxy / this.player.maxOxy : 1;
+        const staRatio = this.player.maxStamina > 0 ? this.player.stamina / this.player.maxStamina : 1;
+        this.player.maxOxy = this.derived.maxOxy;
+        this.player.maxStamina = this.derived.maxStamina;
+        this.player.oxy = Math.min(this.player.maxOxy, Math.max(0, oxyRatio * this.player.maxOxy));
+        this.player.stamina = Math.min(this.player.maxStamina, Math.max(0, staRatio * this.player.maxStamina));
+        this.player.firebreakCharges = Math.min(this.player.firebreakCharges || this.derived.firebreakChargesMax, this.derived.firebreakChargesMax);
+    }
+
+    claimTalentPointsFromLevels() {
+        const claimable = Math.floor(this.player.lvl / DATA.talentEveryLevels);
+        if (claimable > this.spec.levelsClaimed) {
+            const gained = claimable - this.spec.levelsClaimed;
+            this.spec.points += gained;
+            this.spec.levelsClaimed = claimable;
+            this.log(`Získal jsi ${gained} talent bod(y). Otevři T.`, 'coin');
+            this.renderTalentPanel();
+        }
+    }
+
+    getEquippedSkin() { return SKIN_SHOP.find(s => s.id === this.player.equippedSkin) || SKIN_SHOP[0]; }
+    isNearTree() { return Math.hypot(this.player.x, this.player.y) <= DATA.healAuraRadius; }
+    isNearShop() { return Math.hypot(this.player.x, this.player.y) <= DATA.shopAuraRadius; }
+
+    getWaveTarget(wave) {
+        if (wave <= 1) return 1;
+        if (wave <= 3) return 2;
+        if (wave <= 5) return 3;
+        if (wave <= 8) return 5 + Math.floor((wave - 6) * 1.5);
+        if (wave <= 12) return 10 + (wave - 8) * 2;
+        return 18 + Math.floor((wave - 12) * 2.5);
+    }
+
+    randomizeWind(force=false) {
+        this.wind.angle = Math.random() * Math.PI * 2;
+        this.wind.strength = rand(DATA.windStrengthMin, DATA.windStrengthMax);
+        this.wind.timer = DATA.windChangeInterval * rand(0.7, 1.25);
+        if (!force) this.log(`Vítr se otočil. Směr ${Math.round((this.wind.angle * 180 / Math.PI + 360) % 360)}°`, 'coin');
+    }
+
+    windVec() { return { x: Math.cos(this.wind.angle), y: Math.sin(this.wind.angle) }; }
+
+    getNearbyDangerFires() {
+        const nearby = [];
+        for (const tile of this.tiles.values()) {
+            if (tile.fire <= 0) continue;
+            const dist = Math.hypot(tile.x - this.player.x, tile.y - this.player.y);
+            if (dist > DATA.fireDangerRadius) continue;
+            nearby.push({ tile, dist });
+        }
+        this.megaFires.forEach(m => {
+            const dist = Math.hypot(m.x - this.player.x, m.y - this.player.y) - m.radius;
+            if (dist <= DATA.fireDangerRadius) nearby.push({ tile: { fire: 100, mega: true }, dist: Math.max(0, dist) });
+        });
+        nearby.sort((a, b) => a.dist - b.dist);
+        return nearby.slice(0, DATA.fireDangerCap + this.getTalentLevel('bulldozer'));
+    }
+
+    getBurningBushContactDamage() {
+        let damage = 0, touching = 0;
+        for (const tile of this.tiles.values()) {
+            if (tile.type !== 'bush' || tile.fire <= 0) continue;
+            const dist = Math.hypot(tile.x - this.player.x, tile.y - this.player.y);
+            if (dist > DATA.burningBushTouchRadius) continue;
+            const influence = Math.max(0.15, 1 - dist / DATA.burningBushTouchRadius);
+            damage += DATA.burningBushTouchDamagePerSecond * influence;
+            touching++;
+        }
+        this.megaFires.forEach(m => {
+            const dist = Math.hypot(m.x - this.player.x, m.y - this.player.y);
+            if (dist <= m.radius + 32) { damage += 5.5; touching++; }
+        });
+        if (this.gameState === 'COOLDOWN') damage *= DATA.cooldownBurnDamageMultiplier;
+        return { damage, touching };
+    }
+
+    getSmokeDamage() {
+        let damage = 0;
+        this.smokeClouds.forEach(s => {
+            const dist = Math.hypot(s.x - this.player.x, s.y - this.player.y);
+            if (dist < s.radius + DATA.smokePlayerRadius) {
+                damage += DATA.smokeDamagePerSecond * (1 - dist / (s.radius + DATA.smokePlayerRadius));
+            }
+        });
+        return Math.max(0, damage * (1 + this.wind.strength * DATA.windSmokeMultiplier));
+    }
+
+    triggerWaveStartEffect() { this.fx.waveFlash = Math.max(this.fx.waveFlash, DATA.waveStartVignetteTime); }
+
+    startWave() {
+        this.gameState = 'WAVE';
+        this.timer = 0;
+        this.lastSpawn = 0;
+        this.waveTarget = this.getWaveTarget(this.wave);
+        this.waveProgress = 0;
+        this.waveActiveFireCap = Math.max(2, Math.min(this.waveTarget + DATA.activeFireBonusVsTarget, DATA.activeFireCapBase + Math.floor(this.wave * DATA.activeFireCapPerWave)));
+        this.player.firebreakCharges = this.derived.firebreakChargesMax;
+        this.generateBushesForWave();
+        this.spawnAnimalsForWave();
+        this.spawnMegaFiresForWave();
+        const openingFireCount = Math.max(1, Math.min(this.waveActiveFireCap, Math.ceil(this.waveTarget * DATA.openingFireRatio)));
+        this.spawnFire(openingFireCount);
+        this.triggerWaveStartEffect();
+        this.log(`🔥 VLNA ${this.wave} ZAČÍNÁ! Cíl: ${this.waveProgress}/${this.waveTarget}`, 'fire');
+        document.getElementById('wave-title').innerText = `WAVE ${this.wave}`;
+        document.getElementById('wave-title').style.color = '#ff7b72';
+        document.getElementById('skip-btn').style.display = 'none';
+    }
+
+    endWave() {
+        this.gameState = 'COOLDOWN';
+        this.timer = DATA.cooldownTime;
+        this.wave++;
+        this.achievements.wavesCleared++;
+        this.player.firebreakCharges = this.derived.firebreakChargesMax;
+        this.log('Vlna vyčištěna! Máš cooldown. U stromu regeneruješ a nakupuješ.', 'heal');
+        document.getElementById('wave-title').innerText = 'COOLDOWN';
+        document.getElementById('wave-title').style.color = '#58a6ff';
+        document.getElementById('skip-btn').style.display = 'inline-block';
+    }
+
+    generateBushesForWave() {
+        const needed = DATA.bushSpawnBase + this.wave * DATA.bushSpawnPerWave;
+        const center = this.worldToAxial(this.player.x, this.player.y);
+        let placed = 0, tries = 0;
+        while (placed < needed && tries < needed * 50) {
+            tries++;
+            const q = center.q + Math.floor((Math.random() - 0.5) * 30);
+            const r = center.r + Math.floor((Math.random() - 0.5) * 30);
+            const tile = this.ensureTile(q, r);
+            if (!tile || tile.type === 'tree') continue;
+            if (Math.hypot(tile.x, tile.y) < DATA.shopAuraRadius + 40) continue;
+            if (tile.type !== 'bush') {
+                tile.type = 'bush'; tile.bushHealth = 1; tile.scorch = Math.max(0, tile.scorch * 0.4);
+            }
+            tile.generatedInWave = this.wave;
+            let fireChance = DATA.bushFireChance;
+            if (tile.biome === 'steppe') fireChance *= 1.25;
+            if (tile.biome === 'marsh') fireChance *= 0.72;
+            if (tile.fire <= 0 && Math.random() < fireChance) { tile.fire = 100; tile.burnTime = 0; }
+            placed++;
+        }
+    }
+
+    spawnAnimalsForWave() {
+        const amount = DATA.animalSpawnBase + Math.floor(this.wave / 5) * DATA.animalSpawnPerFiveWaves;
+        const center = this.worldToAxial(this.player.x, this.player.y);
+        for (let i = 0; i < amount; i++) {
+            const q = center.q + Math.floor(rand(-10, 10));
+            const r = center.r + Math.floor(rand(-10, 10));
+            const tile = this.ensureTile(q, r);
+            if (!tile || tile.type === 'tree') continue;
+            const type = ANIMAL_TYPES[Math.floor(Math.random() * ANIMAL_TYPES.length)];
+            this.animals.push({
+                id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+                x: tile.x + rand(-18, 18), y: tile.y + rand(-18, 18),
+                vx: 0, vy: 0, type, following: false, rescued: false, dead: false, timer: rand(0, 999)
+            });
+        }
+    }
+
+    spawnMegaFiresForWave() {
+        if (this.wave < DATA.megaFireStartWave) return;
+        if ((this.wave - DATA.megaFireStartWave) % DATA.megaFireWaveEvery !== 0) return;
+        const count = 1 + Math.floor(this.wave / 12);
+        const center = this.worldToAxial(this.player.x, this.player.y);
+        for (let i = 0; i < count; i++) {
+            const q = center.q + Math.floor(rand(-9, 9));
+            const r = center.r + Math.floor(rand(-9, 9));
+            const tile = this.ensureTile(q, r);
+            if (!tile) continue;
+            const hp = DATA.megaFireHpBase + this.wave * DATA.megaFireHpPerWave;
+            this.megaFires.push({ x: tile.x, y: tile.y, hp, maxHp: hp, radius: DATA.megaFireRadius + i * 6, timer: rand(0.6, 1.5) });
+            this.log('💀 MegaFire se zrodil v divočině.', 'fire');
+        }
+    }
+
+    getRandomFireCandidates() {
+        const arr = [];
+        for (const tile of this.tiles.values()) {
+            if (tile.type === 'tree') continue;
+            if (tile.fire > 0) continue;
+            if (this.isTileProtectedByFirebreak(tile)) continue;
+            if (Math.hypot(tile.x - this.player.x, tile.y - this.player.y) < 90) continue;
+            if (tile.type === 'bush' || tile.type.startsWith('grass') || tile.type === 'flowers') arr.push(tile);
+        }
+        return arr;
+    }
+
+    spawnFire(count) {
+        const candidates = this.getRandomFireCandidates();
+        for (let i = 0; i < count && candidates.length > 0; i++) {
+            const index = Math.floor(Math.random() * candidates.length);
+            const tile = candidates.splice(index, 1)[0];
+            tile.fire = 100; tile.burnTime = 0;
+        }
+    }
+
+    updateChestPreview() {
+        document.getElementById('wheel-last-result').innerText = this.fateWheel?.lastResult || 'Čeká na první spin';
+    }
+
+    openChest() {
+        this.paused = true;
+        this.pendingChest = true;
+        this.updateChestPreview();
+        document.getElementById('overlay-chest').style.display = 'flex';
+    }
+    closeChest() {
+        document.getElementById('overlay-chest').style.display = 'none';
+        this.paused = false;
+        this.pendingChest = false;
+    }
+    weightedChestRoll() {
+        const total = FATE_WHEEL.reduce((s, c) => s + c.weight, 0);
+        let roll = Math.random() * total;
+        for (const card of FATE_WHEEL) {
+            roll -= card.weight;
+            if (roll <= 0) return card;
+        }
+        return FATE_WHEEL[0];
+    }
+    applyFateOutcome(result, source='auto') {
+        if (!result) return;
+        if (result.type === 'skill') {
+            this.addSkill(result.id, result.amount || 1);
+            const def = SKILLS.find(s => s.id === result.id);
+            this.fateWheel.lastResult = `${result.label}`;
+            this.log(`${source === 'auto' ? '🎡 Auto wheel:' : '🎡 Wheel:'} ${def ? def.icon + ' ' + def.name : result.label}`, result.good ? 'coin' : 'bad');
+        } else if (result.type === 'coins') {
+            this.player.coins = Math.max(0, this.player.coins + result.amount);
+            this.fateWheel.lastResult = `${result.label}`;
+            this.log(`${source === 'auto' ? '🎡 Auto wheel:' : '🎡 Wheel:'} ${result.label}`, result.good ? 'coin' : 'bad');
+        }
+        this.updateDerivedStats();
+        this.renderShop();
+        this.updateUI();
+        this.updateChestPreview();
+    }
+    spinFateWheel(forceOpen=false) {
+        const result = this.weightedChestRoll();
+        this.fateWheel.timer = DATA.autoWheelInterval;
+        if (forceOpen && this.pendingChest) this.closeChest();
+        this.applyFateOutcome(result, forceOpen ? 'manual' : 'auto');
+    }
+
+    addXp(amount) {
+        this.player.xp += amount;
+        while (this.player.xp >= this.player.nextXp) {
+            this.player.xp -= this.player.nextXp;
+            this.player.lvl++;
+            this.player.nextXp = Math.floor(this.player.nextXp * 1.3);
+            this.claimTalentPointsFromLevels();
+            this.openChest();
+        }
+    }
+    addCoins(amount) { this.player.coins += amount; this.renderShop(); }
+
+    killFire(tile) {
+        const burnFactor = Math.min(1, tile.burnTime / 7);
+        tile.fire = 0; tile.scorch = Math.max(tile.scorch, burnFactor);
+        if (tile.type === 'bush') tile.bushHealth = Math.max(0.18, 1 - burnFactor);
+        if (this.gameState === 'WAVE') this.waveProgress = Math.min(this.waveTarget, this.waveProgress + 1);
+        this.player.oxy = Math.min(this.player.maxOxy, this.player.oxy + DATA.oxyPerKill);
+        this.addXp(DATA.xpPerKill);
+        this.addCoins(DATA.coinsPerKill + Math.round((1 - burnFactor) * 6));
+        this.achievements.quenched++;
+        this.createExplosion(tile.x, tile.y);
+    }
+
+    killMegaFire(mega) {
+        this.addXp(DATA.megaFireRewardXp);
+        this.addCoins(DATA.megaFireRewardCoins);
+        this.waveProgress = Math.min(this.waveTarget, this.waveProgress + DATA.megaFireWaveProgressReward);
+        this.achievements.megasKilled++;
+        this.log('☄️ MegaFire byl zničen!', 'coin');
+        this.createExplosion(mega.x, mega.y);
+        for (let i = 0; i < 20; i++) this.particles.push({ x: mega.x, y: mega.y, vx: rand(-6,6), vy: rand(-6,6), life: rand(0.6,1.2), color: i%2 ? '#ff7b72' : '#d2a8ff' });
+    }
+
+    tryStomp() {
+        const now = performance.now() / 1000;
+        if (now - this.lastStompAt < DATA.stompCooldown) return;
+        this.lastStompAt = now;
+        const radius = this.derived.stompRadius;
+        let hits = 0;
+        this.rings.push({ x: this.player.x, y: this.player.y, radius, life: 0.22 });
+        for (const tile of this.tiles.values()) {
+            if (tile.fire > 0 && Math.hypot(this.player.x - tile.x, this.player.y - tile.y) <= radius) { this.killFire(tile); hits++; }
+        }
+        this.megaFires = this.megaFires.filter(m => {
+            const dist = Math.hypot(this.player.x - m.x, this.player.y - m.y);
+            if (dist <= radius + m.radius) {
+                m.hp -= DATA.stompMegaDamage * this.derived.megaDamageMultiplier;
+                hits++;
+                if (m.hp <= 0) { this.killMegaFire(m); return false; }
+            }
+            return true;
+        });
+        if (hits > 0) this.log(`💥 Stomp! Zasaženo ${hits} cílů.`, 'heal');
+    }
+
+    calculateDrain() {
+        const nearby = this.getNearbyDangerFires();
+        let totalDrain = 0;
+        const phase = this.getDayPhaseInfo();
+        for (let i = 1; i < nearby.length; i++) {
+            const influence = Math.max(DATA.fireInfluenceMin, 1 - nearby[i].dist / DATA.fireInfluenceFalloffRadius);
+            const perFire = Math.max(0, DATA.waveFireBaseDamage - i * DATA.waveFireDamageStepDown);
+            totalDrain += perFire * influence;
+        }
+        totalDrain = Math.min(DATA.waveDrainCap, totalDrain);
+        totalDrain *= DATA.waveDrainMultiplier;
+        totalDrain *= this.derived.scrubberFactor;
+        totalDrain *= this.derived.smokeFactor;
+        if (phase.label === 'Night') totalDrain *= DATA.dayNightNightBonusDrain;
+        return { drain: totalDrain, count: nearby.length };
+    }
+
+    tryPlaceFirebreak() {
+        if (this.paused) return;
+        if ((this.player.firebreakCharges || 0) <= 0) return;
+        if (this.player.stamina < DATA.firebreakCostStamina) return;
+        let dx = this.input.right - this.input.left;
+        let dy = this.input.down - this.input.up;
+        if (dx === 0 && dy === 0) {
+            const speed = Math.hypot(this.player.vx, this.player.vy);
+            if (speed > 1) { dx = this.player.vx / speed; dy = this.player.vy / speed; }
+            else { dx = 1; dy = 0; }
+        }
+        const len = Math.hypot(dx, dy) || 1;
+        dx /= len; dy /= len;
+        const angle = Math.atan2(dy, dx) + Math.PI / 2;
+        this.firebreaks.push({ x: this.player.x, y: this.player.y, angle, length: this.derived.firebreakLength, life: this.derived.firebreakDuration, maxLife: this.derived.firebreakDuration });
+        this.player.stamina = Math.max(0, this.player.stamina - DATA.firebreakCostStamina);
+        this.player.firebreakCharges--;
+        this.achievements.firebreaksPlaced++;
+        this.log('🧱 Firebreak položen.', 'coin');
+    }
+
+    distanceToSegment(px, py, x1, y1, x2, y2) {
+        const A = px - x1; const B = py - y1; const C = x2 - x1; const D = y2 - y1;
+        const dot = A * C + B * D; const lenSq = C * C + D * D; const t = lenSq ? clamp(dot / lenSq, 0, 1) : 0;
+        const xx = x1 + C * t; const yy = y1 + D * t;
+        return Math.hypot(px - xx, py - yy);
+    }
+
+    isTileProtectedByFirebreak(tile) {
+        return this.firebreaks.some(f => {
+            const dx = Math.cos(f.angle) * f.length * 0.5; const dy = Math.sin(f.angle) * f.length * 0.5;
+            return this.distanceToSegment(tile.x, tile.y, f.x - dx, f.y - dy, f.x + dx, f.y + dy) < DATA.firebreakRadius;
+        });
+    }
+
+    updateMovement(dt) {
+        let ix = 0, iy = 0;
+        if (this.input.left) ix -= 1; if (this.input.right) ix += 1; if (this.input.up) iy -= 1; if (this.input.down) iy += 1;
+        if (ix !== 0 || iy !== 0) { const len = Math.hypot(ix, iy) || 1; ix /= len; iy /= len; }
+        let targetMaxSpeed = this.derived.baseMoveSpeed;
+        let sprinting = false;
+        if (this.input.sprint && this.player.stamina > 0 && (ix !== 0 || iy !== 0)) {
+            sprinting = true; targetMaxSpeed *= this.derived.sprintMultiplier; this.player.stamina = Math.max(0, this.player.stamina - this.derived.staminaDrain * dt);
+        } else {
+            this.player.stamina = Math.min(this.player.maxStamina, this.player.stamina + this.derived.staminaRegen * dt);
+        }
+        this.player.sprinting = sprinting;
+        const desiredVx = ix * targetMaxSpeed, desiredVy = iy * targetMaxSpeed, accel = DATA.acceleration * dt;
+        this.player.vx += (desiredVx - this.player.vx) * Math.min(1, accel / Math.max(1, targetMaxSpeed));
+        this.player.vy += (desiredVy - this.player.vy) * Math.min(1, accel / Math.max(1, targetMaxSpeed));
+        if (ix === 0) this.player.vx += (0 - this.player.vx) * Math.min(1, DATA.braking * dt);
+        if (iy === 0) this.player.vy += (0 - this.player.vy) * Math.min(1, DATA.braking * dt);
+        const speed = Math.hypot(this.player.vx, this.player.vy);
+        if (speed > targetMaxSpeed) { const factor = targetMaxSpeed / speed; this.player.vx *= factor; this.player.vy *= factor; }
+        const nextX = this.player.x + this.player.vx * dt * (this.derived.rescueMoveBonus || 1);
+        const nextY = this.player.y + this.player.vy * dt * (this.derived.rescueMoveBonus || 1);
+        const nextDist = Math.hypot(nextX, nextY);
+        if (nextDist < DATA.treeRadius) {
+            const nx = nextDist === 0 ? 1 : nextX / nextDist; const ny = nextDist === 0 ? 0 : nextY / nextDist;
+            this.player.x = nx * DATA.treeRadius; this.player.y = ny * DATA.treeRadius; this.player.vx *= 0.4; this.player.vy *= 0.4;
+        } else { this.player.x = nextX; this.player.y = nextY; }
+        this.ensureTerrainAround(this.player.x, this.player.y, DATA.renderTileRadius + 5);
+    }
+
+    updateFires(dt) {
+        const wind = this.windVec();
+        const burning = [];
+        for (const tile of this.tiles.values()) {
+            if (tile.fire <= 0) continue;
+            burning.push(tile);
+            tile.burnTime += dt;
+            tile.scorch = Math.min(1, tile.scorch + dt * 0.04);
+            if (tile.type === 'bush') tile.bushHealth = Math.max(0, tile.bushHealth - dt * 0.04);
+            const nearCamera = Math.abs(tile.x - this.camera.x) < 520 && Math.abs(tile.y - this.camera.y) < 520;
+            if (nearCamera && this.smokeClouds.length < DATA.maxSmokeClouds && Math.random() < DATA.smokeSpawnRate * dt * 22) {
+                this.smokeClouds.push({
+                    x: tile.x, y: tile.y - 18,
+                    vx: wind.x * (26 + this.wind.strength * 44) + rand(-8, 8),
+                    vy: wind.y * (26 + this.wind.strength * 44) + rand(-8, 8),
+                    radius: rand(22, 34), life: rand(DATA.smokeLifeMin, DATA.smokeLifeMax), maxLife: 1
+                });
+            }
+        }
+        this.activeBurningTiles = burning.slice(0, DATA.maxTrackedBurningTiles);
+    }
+
+    updateSmoke(dt) {
+        for (const s of this.smokeClouds) {
+            s.x += s.vx * dt;
+            s.y += s.vy * dt;
+            s.life -= dt;
+            s.radius += dt * 6;
+        }
+        this.smokeClouds = this.smokeClouds
+            .filter(s => s.life > 0 && Math.abs(s.x - this.camera.x) < 950 && Math.abs(s.y - this.camera.y) < 950)
+            .slice(-DATA.maxSmokeClouds);
+    }
+
+    updateWind(dt) {
+        this.wind.timer -= dt;
+        if (this.wind.timer <= 0) this.randomizeWind();
+    }
+
+    updateMegaFires(dt) {
+        const wind = this.windVec();
+        this.megaFires.forEach(m => {
+            m.timer -= dt;
+            const nearCamera = Math.abs(m.x - this.camera.x) < 620 && Math.abs(m.y - this.camera.y) < 620;
+            if (nearCamera && this.smokeClouds.length < DATA.maxSmokeClouds && Math.random() < DATA.smokeSpawnRate * 2.3 * dt * 22) {
+                this.smokeClouds.push({
+                    x: m.x + rand(-12,12), y: m.y + rand(-12,12),
+                    vx: wind.x * (34 + this.wind.strength * 70),
+                    vy: wind.y * (34 + this.wind.strength * 70),
+                    radius: rand(30, 48), life: rand(2.4, 4.6), maxLife: 1
+                });
+            }
+            if (m.timer <= 0) {
+                m.timer = DATA.megaFireSpawnFireInterval * rand(0.7, 1.2);
+                const src = this.worldToAxial(m.x, m.y);
+                for (let i = 0; i < 2; i++) {
+                    const tile = this.ensureTile(src.q + Math.floor(rand(-2,2)), src.r + Math.floor(rand(-2,2)));
+                    if (tile && tile.type !== 'tree' && !this.isTileProtectedByFirebreak(tile)) { tile.fire = 100; tile.burnTime = 0; }
+                }
+            }
+        });
+    }
+
+    nearestFireInfo(x, y) {
+        let nearest = null;
+        let dist = Infinity;
+        for (const tile of this.activeBurningTiles || []) {
+            const d = Math.hypot(tile.x - x, tile.y - y);
+            if (d < dist) { dist = d; nearest = { x: tile.x, y: tile.y, d }; }
+        }
+        this.megaFires.forEach(m => {
+            const d = Math.hypot(m.x - x, m.y - y) - m.radius;
+            if (d < dist) { dist = d; nearest = { x: m.x, y: m.y, d }; }
+        });
+        return nearest;
+    }
+
+    updateAnimals(dt) {
+        this.animals.forEach(a => {
+            if (a.dead || a.rescued) return;
+            a.timer += dt;
+            const fire = this.nearestFireInfo(a.x, a.y);
+            if (a.following) {
+                const dx = this.player.x - a.x + Math.sin(a.timer * 6) * 18;
+                const dy = this.player.y - a.y + Math.cos(a.timer * 5) * 18;
+                const len = Math.hypot(dx, dy) || 1;
+                a.vx = dx / len * a.type.speed * 1.2;
+                a.vy = dy / len * a.type.speed * 1.2;
+                a.x += a.vx * dt; a.y += a.vy * dt;
+                if (Math.hypot(a.x, a.y) < DATA.animalBaseDeliverRadius) {
+                    a.rescued = true;
+                    this.achievements.rescued++;
+                    this.addCoins(DATA.animalRewardCoins);
+                    this.addXp(DATA.animalRewardXp);
+                    this.log(`${a.type.icon} zachráněn a doveden do bezpečí.`, 'coin');
+                }
+                return;
+            }
+            if (Math.hypot(a.x - this.player.x, a.y - this.player.y) <= DATA.animalRescueRadius) {
+                a.following = true;
+                this.log(`${a.type.icon} tě následuje. Doveď ho ke stromu.`, 'heal');
+            }
+            let dx = Math.cos(a.timer * 0.8 + a.x * 0.001), dy = Math.sin(a.timer * 0.7 + a.y * 0.001);
+            if (fire && fire.d < DATA.animalFireFearRadius) {
+                dx += (a.x - fire.x) / Math.max(1, fire.d) * 2.8;
+                dy += (a.y - fire.y) / Math.max(1, fire.d) * 2.8;
+                if (fire.d < 35) { a.dead = true; this.achievements.animalsLost++; this.log(`${a.type.icon} shořel v chaosu.`, 'bad'); }
+            }
+            const len = Math.hypot(dx, dy) || 1;
+            a.vx = dx / len * a.type.speed;
+            a.vy = dy / len * a.type.speed;
+            a.x += a.vx * dt; a.y += a.vy * dt;
+        });
+        this.animals = this.animals.filter(a => !a.rescued && !a.dead || Math.random() < 1.1);
+    }
+
+    maybeSpreadFire(dt) {
+        const burning = this.activeBurningTiles || [];
+        const activeFires = burning.length + this.megaFires.length;
+        if (activeFires >= this.waveActiveFireCap) return;
+        const phase = this.getDayPhaseInfo();
+        let rate = Math.max(900, DATA.fireSpreadRateBase - this.wave * DATA.fireSpreadWaveAcceleration);
+        if (phase.label === 'Day') rate /= DATA.dayNightDayBonusSpread;
+        rate /= (1 + this.wind.strength * DATA.windSpreadMultiplier * 0.4);
+        this.lastSpawn += dt * 1000;
+        if (this.lastSpawn < rate) return;
+        this.lastSpawn = 0;
+        if (!burning.length) { this.spawnFire(1); return; }
+        const src = burning[Math.floor(Math.random() * burning.length)];
+        const neighbors = [[1,0],[-1,0],[0,1],[0,-1],[1,-1],[-1,1]];
+        const wind = this.windVec();
+        const srcAx = this.worldToAxial(src.x, src.y);
+        let weighted = [];
+        neighbors.forEach(n => {
+            const tile = this.ensureTile(srcAx.q + n[0], srcAx.r + n[1]);
+            if (!tile || tile.type === 'tree' || tile.fire > 0 || this.isTileProtectedByFirebreak(tile)) return;
+            const dx = tile.x - src.x, dy = tile.y - src.y;
+            const dir = (dx * wind.x + dy * wind.y) / Math.max(1, Math.hypot(dx, dy));
+            let chance = tile.type === 'bush' ? 0.8 : 0.28;
+            if (tile.biome === 'steppe') chance *= 1.35;
+            if (tile.biome === 'marsh') chance *= 0.6;
+            if (tile.biome === 'forest') chance *= 1.15;
+            chance *= 1 + Math.max(0, dir) * this.wind.strength * DATA.windSpreadMultiplier;
+            weighted.push({ tile, chance });
+        });
+        weighted = weighted.sort((a, b) => b.chance - a.chance);
+        for (const option of weighted) {
+            if (Math.random() < option.chance) { option.tile.fire = 100; option.tile.burnTime = 0; break; }
+        }
+    }
+
+    update(dt) {
+        if (this.paused) return;
+        this.totalTime += dt;
+        this.updateMovement(dt);
+        this.updateWind(dt);
+        this.updateFires(dt);
+        this.updateSmoke(dt);
+        this.updateMegaFires(dt);
+        this.updateAnimals(dt);
+        this.fateWheel.timer -= dt;
+        if (this.fateWheel.timer <= 0) this.spinFateWheel(false);
+
+        const burnContact = this.getBurningBushContactDamage();
+        const smokeDamage = this.getSmokeDamage();
+
+        if (this.gameState === 'COOLDOWN') {
+            this.timer -= dt;
+            document.getElementById('wave-timer').innerText = `Další vlna za: ${Math.max(0, Math.ceil(this.timer))} s`;
+            if (this.isNearTree()) {
+                this.player.oxy = Math.min(this.player.maxOxy, this.player.oxy + DATA.treeHealPerSecond * dt);
+                this.player.stamina = Math.min(this.player.maxStamina, this.player.stamina + 18 * dt);
+                this.player.firebreakCharges = this.derived.firebreakChargesMax;
+            }
+            if (burnContact.damage > 0 || smokeDamage > 0) {
+                const total = burnContact.damage + smokeDamage;
+                this.player.oxy -= total * dt;
+                this.fx.burnFlash = Math.max(this.fx.burnFlash, Math.min(1, total / 8));
+                document.getElementById('drain-info').innerText = `Cooldown hazard: -${total.toFixed(1)}/s`;
+            } else {
+                document.getElementById('drain-info').innerText = this.isNearTree() ? 'U stromu regeneruješ kyslík.' : 'Mimo strom není heal.';
+            }
+            if (this.timer <= 0) this.startWave();
+        } else {
+            document.getElementById('wave-timer').innerText = `Cíl vlny: ${this.waveProgress} / ${this.waveTarget}`;
+            const { drain, count } = this.calculateDrain();
+            const totalDrain = drain + burnContact.damage + smokeDamage;
+            this.player.oxy -= totalDrain * dt;
+            if (burnContact.damage > 0 || smokeDamage > 0) this.fx.burnFlash = Math.max(this.fx.burnFlash, Math.min(1, (burnContact.damage + smokeDamage) / 6));
+            document.getElementById('drain-info').innerText = totalDrain > 0 ? `Kouř: -${drain.toFixed(1)}/s • Hoření: -${burnContact.damage.toFixed(1)}/s • Mrak: -${smokeDamage.toFixed(1)}/s` : (count > 0 ? 'V dálce hoří, ale tlak je nízký.' : 'Žádný blízký kouřový tlak');
+            if (this.waveProgress >= this.waveTarget) this.endWave();
+            this.maybeSpreadFire(dt);
+        }
+
+        if (this.player.oxy <= 0) { alert(`Uhořel jsi ve vlně ${this.wave}.`); location.reload(); }
+
+        this.firebreaks.forEach(f => f.life -= dt);
+        this.firebreaks = this.firebreaks.filter(f => f.life > 0);
+        this.fx.waveFlash = Math.max(0, this.fx.waveFlash - dt);
+        this.fx.burnFlash = Math.max(0, this.fx.burnFlash - dt * 2.4);
+        const waveOpacity = (this.fx.waveFlash / Math.max(0.001, DATA.waveStartVignetteTime)) * DATA.waveStartVignetteStrength;
+        const burnOpacity = this.fx.burnFlash * DATA.burnVignetteStrength;
+        document.getElementById('damage-vignette').style.opacity = Math.max(waveOpacity, burnOpacity).toFixed(3);
+        document.getElementById('night-vignette').style.opacity = this.getDayPhaseInfo().darkness.toFixed(3);
+
+        this.camera.x += (this.player.x - this.camera.x) * DATA.cameraLerp;
+        this.camera.y += (this.player.y - this.camera.y) * DATA.cameraLerp;
+        this.particles.forEach(p => { p.x += p.vx * dt * 60; p.y += p.vy * dt * 60; p.life -= dt; });
+        this.particles = this.particles.filter(p => p.life > 0).slice(-DATA.maxParticles);
+        this.rings.forEach(r => r.life -= dt);
+        this.rings = this.rings.filter(r => r.life > 0);
+        this.updateUI();
+    }
+
+    getUnlockedAchievements() {
+        const list = [];
+        if (this.achievements.quenched >= 25) list.push('🔥 25 quenched');
+        if (this.achievements.quenched >= 100) list.push('🔥 100 quenched');
+        if (this.achievements.rescued >= 3) list.push('🦌 3 rescued');
+        if (this.achievements.rescued >= 10) list.push('🦊 10 rescued');
+        if (this.achievements.megasKilled >= 1) list.push('💀 Mega slayer');
+        if (this.achievements.wavesCleared >= 10) list.push('🌊 Wave 10');
+        if (this.achievements.firebreaksPlaced >= 10) list.push('🧱 Break master');
+        return list;
+    }
+
+    updateUI() {
+        const oxyPercent = this.player.oxy / this.player.maxOxy * 100;
+        const staPercent = this.player.stamina / this.player.maxStamina * 100;
+        const xpPercent = this.player.xp / this.player.nextXp * 100;
+        document.getElementById('oxy-fill').style.width = `${clamp(oxyPercent,0,100)}%`;
+        document.getElementById('oxy-text').innerText = `${Math.ceil(this.player.oxy)} / ${this.player.maxOxy}`;
+        document.getElementById('stamina-fill').style.width = `${clamp(staPercent,0,100)}%`;
+        document.getElementById('stamina-text').innerText = `${Math.ceil(this.player.stamina)} / ${this.player.maxStamina}`;
+        document.getElementById('xp-fill').style.width = `${clamp(xpPercent,0,100)}%`;
+        document.getElementById('xp-text').innerText = `${this.player.xp} / ${this.player.nextXp}`;
+        document.getElementById('lvl-val').innerText = this.player.lvl;
+        document.getElementById('coin-text').innerText = this.player.coins;
+        document.getElementById('coin-text-2').innerText = this.player.coins;
+
+        let fireCount = 0, bushCount = 0;
+        for (const tile of this.tiles.values()) { if (tile.fire > 0) fireCount++; if (tile.type === 'bush') bushCount++; }
+        document.getElementById('fire-count').innerText = this.gameState === 'WAVE' ? `${this.waveProgress}/${this.waveTarget}` : fireCount;
+        document.getElementById('bush-count').innerText = bushCount;
+        document.getElementById('animal-count').innerText = this.animals.filter(a => !a.dead && !a.rescued).length;
+
+        const skillsWrap = document.getElementById('active-skills');
+        let html = '';
+        Object.entries(this.player.skills).filter(([,count]) => count > 0).forEach(([id, count]) => {
+            const skill = SKILLS.find(s => s.id === id); if (!skill) return;
+            html += `<span class="skill-tag ${skill.good ? 'skill-good' : 'skill-bad'}">${skill.icon} ${skill.name} x${count}</span>`;
+        });
+        TALENTS.forEach(t => { const lvl = this.getTalentLevel(t.id); if (lvl > 0) html += `<span class="skill-tag skill-good">${t.icon} ${t.name} x${lvl}</span>`; });
+        skillsWrap.innerHTML = html || '<span class="mini">Zatím nic. Level up, shop a talent panel to změní.</span>';
+
+        document.getElementById('radius-readout').innerText = Math.round(this.derived.stompRadius);
+        document.getElementById('base-speed-readout').innerText = Math.round(this.derived.baseMoveSpeed);
+        document.getElementById('sprint-readout').innerText = 'x' + this.derived.sprintMultiplier.toFixed(2);
+        document.getElementById('speed-readout').innerText = Math.round(Math.hypot(this.player.vx, this.player.vy));
+        document.getElementById('wind-readout').innerText = `${Math.round((this.wind.angle * 180 / Math.PI + 360) % 360)}°`;
+        document.getElementById('wind-strength-readout').innerText = this.wind.strength.toFixed(2);
+        document.getElementById('day-readout').innerText = this.getDayPhaseInfo().label;
+        document.getElementById('firebreak-readout').innerText = `${this.player.firebreakCharges || 0}/${this.derived.firebreakChargesMax}`;
+        document.getElementById('biome-readout').innerText = this.ensureTile(this.worldToAxial(this.player.x, this.player.y).q, this.worldToAxial(this.player.x, this.player.y).r).biome;
+
+        const nearShop = this.isNearShop();
+        document.getElementById('shop-panel').style.display = nearShop ? 'flex' : 'none';
+        document.getElementById('compass-panel').style.display = nearShop ? 'none' : 'block';
+        document.getElementById('base-state').innerText = nearShop ? 'U stromu' : 'Mimo základnu';
+        const distanceToCenter = Math.hypot(this.player.x, this.player.y);
+        document.getElementById('center-distance').innerText = `${Math.round(distanceToCenter)} px`;
+        const angle = Math.atan2(-this.player.x, this.player.y) * 180 / Math.PI;
+        document.getElementById('compass-arrow').style.transform = `rotate(${angle}deg)`;
+
+        const achievementList = this.getUnlockedAchievements();
+        const achievementWrap = document.getElementById('achievement-list');
+        achievementWrap.innerHTML = achievementList.length ? achievementList.map(a => `<span class="badge">${a}</span>`).join('') : '<span class="mini">Zatím nic. Vyžeň z lesa víc chaosu.</span>';
+
+        this.renderMinimap();
+    }
+
+    getUpgradeCost(upgradeId) {
+        const def = UPGRADE_SHOP.find(u => u.id === upgradeId); const lvl = this.getSkillCount(upgradeId);
+        return def.baseCost + Math.floor(lvl * def.baseCost * 0.55);
+    }
+
+    renderShop() {
+        const shop = document.getElementById('shop'); shop.innerHTML = '';
+        const skinTitle = document.createElement('div'); skinTitle.className = 'shop-group-title'; skinTitle.textContent = 'Skins'; shop.appendChild(skinTitle);
+        SKIN_SHOP.forEach((skin) => {
+            const owned = this.player.ownedSkins.has(skin.id), equipped = this.player.equippedSkin === skin.id;
+            const card = document.createElement('div'); card.className = 'shop-item';
+            card.innerHTML = `<div class="shop-item-top"><strong>${skin.name}</strong><span class="mini">${owned ? (equipped ? 'Vybaveno' : 'Vlastníš') : `${skin.cost} 🪙`}</span></div><small class="mini">Jen kosmetika, ale ať slon nevypadá furt stejně.</small>`;
+            const btn = document.createElement('button'); btn.className = 'btn';
+            if (equipped) { btn.disabled = true; btn.textContent = 'Aktivní'; }
+            else if (owned) { btn.textContent = 'Equip'; btn.onclick = () => { this.player.equippedSkin = skin.id; this.renderShop(); }; }
+            else {
+                btn.textContent = `Koupit za ${skin.cost}`; btn.disabled = this.player.coins < skin.cost;
+                btn.onclick = () => { if (this.player.coins < skin.cost) return; this.player.coins -= skin.cost; this.player.ownedSkins.add(skin.id); this.player.equippedSkin = skin.id; this.log(`Koupen skin: ${skin.name}`, 'coin'); this.renderShop(); };
+            }
+            card.appendChild(btn); shop.appendChild(card);
+        });
+        const upgradeTitle = document.createElement('div'); upgradeTitle.className = 'shop-group-title'; upgradeTitle.textContent = 'Ability upgrades'; shop.appendChild(upgradeTitle);
+        UPGRADE_SHOP.forEach((upg) => {
+            const cost = this.getUpgradeCost(upg.id), lvl = this.getSkillCount(upg.id);
+            const card = document.createElement('div'); card.className = 'shop-item';
+            card.innerHTML = `<div class="shop-item-top"><strong>${upg.name}</strong><span class="mini">Lvl ${lvl}</span></div><small class="mini">${upg.desc}</small>`;
+            const btn = document.createElement('button'); btn.className = 'btn'; btn.textContent = `Koupit za ${cost} 🪙`; btn.disabled = this.player.coins < cost;
+            btn.onclick = () => { if (this.player.coins < cost) return; this.player.coins -= cost; this.addSkill(upg.id, 1); this.log(`Shop upgrade: ${upg.name}`, 'coin'); this.renderShop(); };
+            card.appendChild(btn); shop.appendChild(card);
+        });
+    }
+
+    log(msg, type = '') {
+        const log = document.getElementById('log');
+        log.innerHTML += `<div class="log-msg ${type ? 'log-' + type : ''}">${msg}</div>`;
+        const items = log.querySelectorAll('.log-msg');
+        if (items.length > 70) items[0].remove();
+    }
+
+    createExplosion(x, y) {
+        for (let i = 0; i < 16; i++) {
+            this.particles.push({ x, y, vx: rand(-8, 8), vy: rand(-8, 8), life: rand(0.45, 0.7), color: Math.random() > 0.5 ? '#ffdf5d' : '#ff7b72' });
+        }
+    }
+
+    project(wx, wy) {
+        const rx = wx - this.camera.x, ry = wy - this.camera.y;
+        const sx = (rx - ry) * DATA.isoScaleX;
+        const sy = (rx + ry) * DATA.isoScaleY - DATA.horizonLift;
+        return { x: sx + this.canvas.width / 2, y: sy + this.canvas.height / 2 };
+    }
+
+    renderMinimap() {
+        if (!this.ui.minimapOpen) return;
+        const ctx = this.minimapCtx; const w = this.minimapCanvas.width, h = this.minimapCanvas.height;
+        ctx.clearRect(0, 0, w, h); ctx.fillStyle = 'rgba(8,15,12,0.92)'; ctx.fillRect(0, 0, w, h);
+        const scale = Math.min(w, h) / (DATA.minimapRadius * 2);
+        const toMap = (x, y) => ({ x: w/2 + (x - this.player.x) * scale, y: h/2 + (y - this.player.y) * scale });
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.arc(w/2, h/2, DATA.shopAuraRadius * scale, 0, Math.PI*2); ctx.stroke();
+        for (const tile of this.tiles.values()) {
+            if (Math.hypot(tile.x - this.player.x, tile.y - this.player.y) > DATA.minimapRadius) continue;
+            const p = toMap(tile.x, tile.y);
+            if (tile.fire > 0) { ctx.fillStyle = '#ff7b72'; ctx.fillRect(p.x-1.5, p.y-1.5, 3, 3); }
+        }
+        this.megaFires.forEach(m => { const p = toMap(m.x, m.y); ctx.fillStyle = '#d2a8ff'; ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI*2); ctx.fill(); });
+        this.animals.forEach(a => { if (a.dead || a.rescued) return; const p = toMap(a.x, a.y); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(p.x, p.y, 2.2, 0, Math.PI*2); ctx.fill(); });
+        this.firebreaks.forEach(f => { const dx = Math.cos(f.angle) * f.length * 0.5, dy = Math.sin(f.angle) * f.length * 0.5; const a = toMap(f.x - dx, f.y - dy), b = toMap(f.x + dx, f.y + dy); ctx.strokeStyle = '#79c0ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); });
+        const base = toMap(0, 0); ctx.fillStyle = '#3fb950'; ctx.beginPath(); ctx.arc(base.x, base.y, 5, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#f2cc60'; ctx.beginPath(); ctx.arc(w/2, h/2, 4, 0, Math.PI*2); ctx.fill();
+        const wind = this.windVec(); ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(26, 28); ctx.lineTo(26 + wind.x * 24, 28 + wind.y * 24); ctx.stroke();
+    }
+
+    render() {
+        const ctx = this.ctx; ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        const centerHex = this.worldToAxial(this.camera.x, this.camera.y); const renderTiles = [];
+        for (let dq = -DATA.renderTileRadius; dq <= DATA.renderTileRadius; dq++) {
+            for (let dr = -DATA.renderTileRadius; dr <= DATA.renderTileRadius; dr++) {
+                const q = centerHex.q + dq, r = centerHex.r + dr;
+                const dist = Math.max(Math.abs(dq), Math.abs(dr), Math.abs(-dq-dr));
+                if (dist > DATA.renderTileRadius) continue;
+                renderTiles.push(this.ensureTile(q, r));
+            }
+        }
+        renderTiles.sort((a, b) => (a.x + a.y) - (b.x + b.y));
+        for (const tile of renderTiles) this.drawIsoTile(tile);
+        for (const cloud of this.smokeClouds.slice(-DATA.maxSmokeRender)) if (Math.abs(cloud.x - this.camera.x) < 640 && Math.abs(cloud.y - this.camera.y) < 640) this.drawSmoke(cloud);
+        for (const breakObj of this.firebreaks) this.drawFirebreak(breakObj);
+        for (const ring of this.rings) this.drawRing(ring);
+        this.drawCenterTree();
+        this.megaFires.forEach(m => this.drawMegaFire(m));
+        this.animals.forEach(a => this.drawAnimal(a));
+        this.drawElephant(this.player.x, this.player.y);
+        this.particles.slice(-DATA.maxParticles).forEach(p => { if (Math.abs(p.x - this.camera.x) > 640 || Math.abs(p.y - this.camera.y) > 640) return; const pos = this.project(p.x, p.y); ctx.globalAlpha = Math.max(0, p.life * 1.6); ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(pos.x, pos.y, 3, 0, Math.PI * 2); ctx.fill(); });
+        ctx.globalAlpha = 1;
+    }
+
+    drawIsoTile(tile) {
+        const ctx = this.ctx; const p = this.project(tile.x, tile.y); const hw = DATA.hexSize * 0.9; const hh = DATA.hexSize * 0.46;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y - hh); ctx.lineTo(p.x + hw, p.y); ctx.lineTo(p.x, p.y + hh); ctx.lineTo(p.x - hw, p.y); ctx.closePath();
+        let fill = '#67b84f';
+        if (tile.biome === 'forest') fill = '#59a845';
+        else if (tile.biome === 'steppe') fill = '#92b24b';
+        else if (tile.biome === 'marsh') fill = '#5a8f63';
+        if (tile.type === 'tree') fill = '#5aa043';
+        else if (tile.type === 'grass2') fill = tile.biome === 'steppe' ? '#a4b84a' : '#60ab46';
+        else if (tile.type === 'flowers') fill = tile.biome === 'meadow' ? '#74c65a' : '#6abf73';
+        else if (tile.type === 'bush') fill = tile.biome === 'steppe' ? '#7d9240' : '#5ea447';
+        if (tile.scorch > 0) {
+            const s = tile.scorch; const r = Math.round(103 * (1 - s) + 77 * s); const g = Math.round(184 * (1 - s) + 66 * s); const b = Math.round(79 * (1 - s) + 36 * s); fill = `rgb(${r},${g},${b})`;
+        }
+        ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = 'rgba(18,39,15,0.24)'; ctx.lineWidth = 1; ctx.stroke();
+        if (tile.type === 'bush') this.drawBush(tile, p);
+        if (tile.type === 'flowers' && tile.fire <= 0) { ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.beginPath(); ctx.arc(p.x + 7, p.y - 4, 2, 0, Math.PI * 2); ctx.arc(p.x - 5, p.y + 1, 2, 0, Math.PI * 2); ctx.fill(); }
+        if (tile.fire > 0) this.drawFire(tile, p);
+    }
+
+    drawBush(tile, p) {
+        const ctx = this.ctx; const health = Math.max(0.15, tile.bushHealth || 1); const green = Math.round(135 * health + 55 * (1 - health)); const red = Math.round(58 * health + 92 * (1 - health));
+        ctx.fillStyle = `rgb(${red},${green},52)`; ctx.beginPath(); ctx.ellipse(p.x - 10, p.y - 6, 12, 8, 0, 0, Math.PI * 2); ctx.ellipse(p.x + 8, p.y - 7, 11, 8, 0, 0, Math.PI * 2); ctx.ellipse(p.x, p.y - 12, 13, 9, 0, 0, Math.PI * 2); ctx.fill();
+    }
+
+    drawFire(tile, p) {
+        const ctx = this.ctx; const pulse = Math.sin(Date.now() / 120 + tile.q * 0.7 + tile.r) * 4;
+        ctx.fillStyle = '#ff9f43'; ctx.beginPath(); ctx.moveTo(p.x, p.y - 26 - pulse); ctx.quadraticCurveTo(p.x + 14, p.y - 8, p.x, p.y + 3); ctx.quadraticCurveTo(p.x - 14, p.y - 8, p.x, p.y - 26 - pulse); ctx.fill();
+        ctx.fillStyle = '#ffd65d'; ctx.beginPath(); ctx.moveTo(p.x, p.y - 18 - pulse * 0.7); ctx.quadraticCurveTo(p.x + 7, p.y - 7, p.x, p.y - 1); ctx.quadraticCurveTo(p.x - 7, p.y - 7, p.x, p.y - 18 - pulse * 0.7); ctx.fill();
+    }
+
+    drawSmoke(s) {
+        const ctx = this.ctx; const p = this.project(s.x, s.y); const alpha = clamp(s.life / 4.5, 0, 0.22);
+        ctx.fillStyle = `rgba(90, 100, 110, ${alpha})`; ctx.beginPath(); ctx.ellipse(p.x, p.y, s.radius, s.radius * DATA.isoScaleY, 0, 0, Math.PI*2); ctx.fill();
+    }
+
+    drawCenterTree() {
+        const p = this.project(0, 0); const ctx = this.ctx;
+        ctx.fillStyle = 'rgba(63,185,80,0.18)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 12, 190, 96, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.font = '60px Arial'; ctx.textAlign = 'center'; ctx.fillText('🌳', p.x, p.y + 20);
+    }
+
+    drawMegaFire(m) {
+        const ctx = this.ctx; const p = this.project(m.x, m.y); const pulse = Math.sin(Date.now() / 90) * 5;
+        ctx.fillStyle = 'rgba(210,168,255,0.16)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 8, m.radius + 10, (m.radius + 10) * DATA.isoScaleY, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#7b32f6'; ctx.beginPath(); ctx.arc(p.x, p.y - 10, m.radius * 0.42 + pulse, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#ff7b72'; ctx.beginPath(); ctx.arc(p.x, p.y - 18, m.radius * 0.28 + pulse * 0.6, 0, Math.PI*2); ctx.fill();
+        const w = 80; ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(p.x - w/2, p.y - m.radius - 28, w, 8); ctx.fillStyle = '#d2a8ff'; ctx.fillRect(p.x - w/2, p.y - m.radius - 28, w * (m.hp / m.maxHp), 8);
+    }
+
+    drawAnimal(a) {
+        if (a.dead || a.rescued) return;
+        const ctx = this.ctx; const p = this.project(a.x, a.y); ctx.font = '18px Arial'; ctx.textAlign = 'center'; ctx.fillText(a.type.icon, p.x, p.y);
+        if (a.following) { ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.arc(p.x, p.y - 6, 12, 0, Math.PI*2); ctx.stroke(); }
+    }
+
+    drawFirebreak(f) {
+        const ctx = this.ctx; const dx = Math.cos(f.angle) * f.length * 0.5; const dy = Math.sin(f.angle) * f.length * 0.5;
+        const a = this.project(f.x - dx, f.y - dy); const b = this.project(f.x + dx, f.y + dy); ctx.strokeStyle = `rgba(121,192,255,${clamp(f.life / f.maxLife, 0.15, 0.8)})`; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+
+    drawRing(r) {
+        const ctx = this.ctx; const p = this.project(r.x, r.y); ctx.strokeStyle = `rgba(210,168,255,${Math.max(0, r.life / 0.22)})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(p.x, p.y, r.radius, r.radius * DATA.isoScaleY, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    drawElephant(x, y) {
+        const ctx = this.ctx; const skin = this.getEquippedSkin(); const p = this.project(x, y); const speed = Math.hypot(this.player.vx, this.player.vy); const bob = Math.sin(Date.now() / (this.player.sprinting ? 70 : 130)) * Math.min(4, speed * 0.018);
+        ctx.save(); ctx.translate(p.x, p.y + bob);
+        ctx.fillStyle = 'rgba(0,0,0,0.24)'; ctx.beginPath(); ctx.ellipse(0, 22, 22, 12, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = skin.ear; ctx.beginPath(); ctx.ellipse(-18, -4, 12, 16, 0.4, 0, Math.PI * 2); ctx.ellipse(18, -4, 12, 16, -0.4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = skin.body; ctx.beginPath(); ctx.ellipse(0, 14, 17, 20, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(0, -4, 18, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = skin.accent; ctx.beginPath(); ctx.arc(-6, -8, 2.2, 0, Math.PI * 2); ctx.arc(6, -8, 2.2, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = skin.ear; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(0, 2); ctx.quadraticCurveTo(6, 14, 0, 26); ctx.stroke();
+        if (this.player.sprinting) { ctx.strokeStyle = 'rgba(121,192,255,0.7)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(0, 8, 28, 14, 0, 0, Math.PI * 2); ctx.stroke(); }
+        ctx.restore();
+    }
+
+    loop(time = 0) {
+        const dt = (time - (this.lastTime || time)) / 1000; this.lastTime = time; this.update(dt); this.render(); requestAnimationFrame((t) => this.loop(t));
+    }
+}
+
+const Game = new StompGame();
+</script>
+
+<script>
+(function(){
+    const game = (typeof Game !== 'undefined') ? Game : window.Game;
+    if (!game) return;
+
+    const EXP = {
+        worldTiles: 16,
+        halfTiles: 8,
+        wavesPerLevel: 15,
+        totalLevels: 5,
+        saveVersion: 1,
+        storageKey: 'stompfire-expanded-progress'
+    };
+
+    function mulberry32(a){
+        return function(){
+            let t = a += 0x6D2B79F5;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
+    function hashSeed(input){
+        let h = 2166136261 >>> 0;
+        const str = String(input);
+        for (let i = 0; i < str.length; i++) {
+            h ^= str.charCodeAt(i);
+            h = Math.imul(h, 16777619);
+        }
+        return h >>> 0;
+    }
+
+    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+    const style = document.createElement('style');
+    style.textContent = `
+    #meta-panel{position:absolute;left:18px;bottom:18px;z-index:40;display:flex;gap:8px;flex-wrap:wrap}
+    #meta-panel .btn{backdrop-filter:blur(6px)}
+    #menu-overlay{position:absolute;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.76);backdrop-filter:blur(7px)}
+    #menu-card{width:min(760px,94vw);max-height:90vh;overflow:auto;background:rgba(12,17,15,.96);border:1px solid rgba(255,255,255,.12);border-radius:24px;box-shadow:0 18px 60px rgba(0,0,0,.45);padding:26px;color:#eef6f0}
+    #menu-card h1,#menu-card h2{margin:0 0 10px 0}
+    #menu-card p{color:#b9c7bc;line-height:1.5}
+    .menu-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:18px}
+    .menu-box{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:16px}
+    .menu-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+    .menu-list{display:flex;flex-direction:column;gap:10px}
+    .seed-line{font-family:ui-monospace,monospace;background:rgba(0,0,0,.26);padding:8px 10px;border-radius:10px;display:inline-block}
+    .level-pill{display:inline-block;padding:5px 10px;border-radius:999px;background:rgba(88,166,255,.16);border:1px solid rgba(88,166,255,.35);font-size:12px;margin-right:6px;margin-bottom:6px}
+    .menu-note{font-size:12px;color:#9eaba0;margin-top:10px}
+    #transition-toast{position:absolute;left:50%;top:90px;transform:translateX(-50%);z-index:55;display:none;background:rgba(10,15,13,.92);border:1px solid rgba(242,204,96,.45);border-radius:16px;padding:14px 18px;box-shadow:0 12px 40px rgba(0,0,0,.35);text-align:center;min-width:280px}
+    #transition-toast strong{display:block;color:#f2cc60;font-size:18px;margin-bottom:4px}
+    @media (max-width: 860px){.menu-grid{grid-template-columns:1fr}}
+    `;
+    document.head.appendChild(style);
+
+    const stage = document.getElementById('stage');
+    const meta = document.createElement('div');
+    meta.id = 'meta-panel';
+    meta.innerHTML = `
+        <button id="menu-btn" class="btn">Menu</button>
+        <button id="save-btn" class="btn">Export save</button>
+        <button id="import-btn" class="btn">Import save</button>
+        <button id="seed-btn" class="btn">Seed</button>
+        <input id="import-file" type="file" accept="application/json" style="display:none" />
+    `;
+    stage.appendChild(meta);
+
+    const menu = document.createElement('div');
+    menu.id = 'menu-overlay';
+    menu.innerHTML = `
+        <div id="menu-card">
+            <div class="menu-grid">
+                <div class="menu-box">
+                    <h1>StompFire Expanded</h1>
+                    <p>Zachovává původní hru a rozšiřuje ji o seed, hranici 16×16 polí, 5 levelů po 15 vlnách, menu a JSON save/load.</p>
+                    <div class="menu-actions">
+                        <button id="new-game-btn" class="btn btn-primary">New game</button>
+                        <button id="continue-btn" class="btn">Continue</button>
+                        <button id="menu-import-btn" class="btn">Load save</button>
+                    </div>
+                    <div style="margin-top:14px">
+                        <div class="mini">Aktivní seed</div>
+                        <div id="menu-seed" class="seed-line">-</div>
+                    </div>
+                    <div style="margin-top:14px">
+                        <div class="mini">Dokončené / odemčené levely</div>
+                        <div id="level-select-box" class="menu-actions"></div>
+                    </div>
+                    <div class="menu-note">Po dohrání 5. levelu se unlockne Level Select. Save drží seed, level, wave, staty i průběžný stav mapy.</div>
+                </div>
+                <div class="menu-box">
+                    <h2>Levely</h2>
+                    <div class="menu-list">
+                        <div><span class="level-pill">1</span> Wilderness — původní venkovní varianta</div>
+                        <div><span class="level-pill">2</span> Desert — suché keře, oázy, rychlejší spread</div>
+                        <div><span class="level-pill">3</span> Jungle — sloni hasí, fauna panikaří i slaví</div>
+                        <div><span class="level-pill">4</span> Warehouse — regály, bedny, akumulátory a chain reaction</div>
+                        <div><span class="level-pill">5</span> City — cesty, budovy, parky, parkoviště, školy</div>
+                    </div>
+                    <div style="margin-top:16px">
+                        <div class="mini">Uložený postup</div>
+                        <div id="progress-readout" class="menu-note">Žádný.</div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    stage.appendChild(menu);
+
+    const toast = document.createElement('div');
+    toast.id = 'transition-toast';
+    toast.innerHTML = '<strong>Level 1</strong><span>Wilderness</span>';
+    stage.appendChild(toast);
+
+    game.exp = { completedGame:false, unlockedLevel:1, selectedSeed:null, seed: null, rng: null, pendingTransition:false, lastElephantCheer:0 };
+
+    const original = {
+        ensureTile: game.ensureTile,
+        biomeAt: game.biomeAt,
+        updateMovement: game.updateMovement,
+        randomizeWind: game.randomizeWind,
+        render: game.render,
+        drawIsoTile: game.drawIsoTile,
+        drawCenterTree: game.drawCenterTree,
+        drawAnimal: game.drawAnimal,
+        updateAnimals: game.updateAnimals,
+        startWave: game.startWave,
+        endWave: game.endWave,
+        renderShop: game.renderShop,
+        updateUI: game.updateUI,
+        maybeSpreadFire: game.maybeSpreadFire,
+        generateBushesForWave: game.generateBushesForWave,
+        spawnAnimalsForWave: game.spawnAnimalsForWave,
+        spawnMegaFiresForWave: game.spawnMegaFiresForWave,
+        spawnFire: game.spawnFire,
+        updateMegaFires: game.updateMegaFires,
+        createExplosion: game.createExplosion,
+        log: game.log
+    };
+
+    game.setSeed = function(seed){
+        this.exp.seed = String(seed);
+        this.seed = String(seed);
+        this.exp.rng = mulberry32(hashSeed(seed));
+    };
+    game.rand = function(){ return this.exp.rng ? this.exp.rng() : Math.random(); };
+    game.randRange = function(a,b){ return a + this.rand() * (b - a); };
+    game.randInt = function(a,b){ return Math.floor(this.randRange(a, b + 1)); };
+    game.seedNoise = function(q,r,offset=0){
+        const h = Math.sin((q + 17.13 + offset) * 127.1 + (r - 91.7 - offset) * 311.7 + hashSeed(this.seed || 1) * 0.0001) * 43758.5453123;
+        return h - Math.floor(h);
+    };
+    game.getCurrentLevelFromWave = function(){
+        return clamp(Math.floor((this.wave - 1) / EXP.wavesPerLevel) + 1, 1, EXP.totalLevels + 1);
+    };
+    game.getLevelName = function(level){
+        return ['','Wilderness','Desert','Jungle','Warehouse','City'][level] || 'Completed';
+    };
+    game.getLevelDescription = function(level){
+        return ['','Outside firefront','Dry shrubs and oasis palms','Dense jungle with helper elephants','Battery warehouse interior','Procedural city response'][level] || 'Run complete';
+    };
+
+    game.getWorldTileBounds = function(){
+        return {
+            minQ: -EXP.halfTiles,
+            maxQ: EXP.halfTiles - 1,
+            minR: -EXP.halfTiles,
+            maxR: EXP.halfTiles - 1
+        };
+    };
+    game.isWorldTileInBounds = function(q, r){
+        const b = this.getWorldTileBounds();
+        return q >= b.minQ && q <= b.maxQ && r >= b.minR && r <= b.maxR;
+    };
+    game.getWorldPixelBounds = function(){
+        const b = this.getWorldTileBounds();
+        const corners = [
+            this.axialToWorld(b.minQ, b.minR),
+            this.axialToWorld(b.maxQ, b.minR),
+            this.axialToWorld(b.maxQ, b.maxR),
+            this.axialToWorld(b.minQ, b.maxR)
+        ];
+        return { corners };
+    };
+    game.showToast = function(title, subtitle){
+        toast.querySelector('strong').textContent = title;
+        toast.querySelector('span').textContent = subtitle;
+        toast.style.display = 'block';
+        clearTimeout(this._toastTimer);
+        this._toastTimer = setTimeout(()=> toast.style.display = 'none', 2600);
+    };
+    game.persistMetaProgress = function(){
+        const state = { completedGame: this.exp.completedGame, unlockedLevel: this.exp.unlockedLevel, lastSeed: this.seed };
+        localStorage.setItem(EXP.storageKey, JSON.stringify(state));
+    };
+    game.loadMetaProgress = function(){
+        try {
+            const data = JSON.parse(localStorage.getItem(EXP.storageKey) || '{}');
+            this.exp.completedGame = !!data.completedGame;
+            this.exp.unlockedLevel = clamp(data.unlockedLevel || 1, 1, 5);
+            if (data.lastSeed) this.exp.selectedSeed = data.lastSeed;
+        } catch(e){}
+    };
+    game.resetWorldState = function(){
+        this.tiles.clear();
+        this.particles = [];
+        this.rings = [];
+        this.megaFires = [];
+        this.animals = [];
+        this.firebreaks = [];
+        this.smokeClouds = [];
+        this.activeBurningTiles = [];
+        this.camera.x = this.player.x;
+        this.camera.y = this.player.y;
+        this.waveProgress = 0;
+        this.waveActiveFireCap = 0;
+        this.lastSpawn = 0;
+        this.ensureTerrainAround(this.player.x, this.player.y, DATA.renderTileRadius + 6);
+    };
+    game.resetRunState = function(seed, startingLevel=1){
+        this.setSeed(seed);
+        this.currentLevel = startingLevel;
+        this.wave = (startingLevel - 1) * EXP.wavesPerLevel + 1;
+        this.gameState = 'COOLDOWN';
+        this.timer = DATA.cooldownTime;
+        this.totalTime = 0;
+        this.player.x = -180; this.player.y = 0; this.player.vx = 0; this.player.vy = 0;
+        this.player.xp = 0; this.player.lvl = 1; this.player.nextXp = DATA.baseXp; this.player.coins = 0;
+        this.player.oxy = this.player.maxOxy = 100; this.player.stamina = this.player.maxStamina = DATA.maxStamina;
+        this.player.skills = {}; this.player.ownedSkins = new Set(['classic']); this.player.equippedSkin = 'classic';
+        this.achievements = { quenched:0,rescued:0,megasKilled:0,firebreaksPlaced:0,wavesCleared:0,animalsLost:0 };
+        this.spec = { points:0, levelsClaimed:0, tree:{ bulldozer:0, sprinter:0, firebreaker:0 } };
+        this.fateWheel = { timer: DATA.autoWheelInterval, lastResult: 'Čeká na první spin' };
+        this.updateDerivedStats();
+        this.resetWorldState();
+        this.renderShop();
+        this.renderTalentPanel();
+        this.showToast(`Level ${this.currentLevel}`, this.getLevelName(this.currentLevel));
+        this.persistMetaProgress();
+    };
+    game.exportSnapshot = function(){
+        return {
+            version: EXP.saveVersion,
+            seed: this.seed,
+            currentLevel: this.currentLevel,
+            wave: this.wave,
+            gameState: this.gameState,
+            timer: this.timer,
+            totalTime: this.totalTime,
+            player: {
+                x: this.player.x, y: this.player.y, vx: this.player.vx, vy: this.player.vy,
+                xp: this.player.xp, lvl: this.player.lvl, nextXp: this.player.nextXp, coins: this.player.coins,
+                oxy: this.player.oxy, maxOxy: this.player.maxOxy, stamina: this.player.stamina, maxStamina: this.player.maxStamina,
+                skills: this.player.skills, ownedSkins: Array.from(this.player.ownedSkins), equippedSkin: this.player.equippedSkin,
+                firebreakCharges: this.player.firebreakCharges || 0
+            },
+            spec: this.spec,
+            achievements: this.achievements,
+            world: {
+                tiles: Array.from(this.tiles.values()).filter(t => t && (t.fire > 0 || t.scorch > 0 || t.type !== 'grass' || t.structure || t.variant || t.hasOasisWater)).map(t => ({
+                    q:t.q,r:t.r,type:t.type,biome:t.biome,fire:t.fire,scorch:t.scorch,burnTime:t.burnTime,bushHealth:t.bushHealth,generatedInWave:t.generatedInWave,
+                    structure:t.structure||null,variant:t.variant||null,hasOasisWater:!!t.hasOasisWater,road:!!t.road,district:t.district||null,flammable:t.flammable!==false,battery:t.battery||false
+                })),
+                megaFires: this.megaFires,
+                animals: this.animals,
+                firebreaks: this.firebreaks,
+                smokeClouds: this.smokeClouds
+            },
+            meta: {
+                unlockedLevel: this.exp.unlockedLevel,
+                completedGame: this.exp.completedGame
+            }
+        };
+    };
+    game.exportSaveToJSON = function(){
+        const data = JSON.stringify(this.exportSnapshot(), null, 2);
+        const blob = new Blob([data], {type:'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `stompfire-save-level${this.currentLevel}-wave${this.wave}.json`;
+        a.click();
+        setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+    };
+    game.applySnapshot = function(data){
+        this.setSeed(data.seed || Date.now());
+        this.currentLevel = clamp(data.currentLevel || 1, 1, 5);
+        this.wave = data.wave || 1;
+        this.gameState = data.gameState || 'COOLDOWN';
+        this.timer = typeof data.timer === 'number' ? data.timer : DATA.cooldownTime;
+        this.totalTime = data.totalTime || 0;
+        const p = data.player || {};
+        this.player.x = p.x || -180; this.player.y = p.y || 0; this.player.vx = p.vx || 0; this.player.vy = p.vy || 0;
+        this.player.xp = p.xp || 0; this.player.lvl = p.lvl || 1; this.player.nextXp = p.nextXp || DATA.baseXp; this.player.coins = p.coins || 0;
+        this.player.oxy = p.oxy || 100; this.player.maxOxy = p.maxOxy || 100; this.player.stamina = p.stamina || DATA.maxStamina; this.player.maxStamina = p.maxStamina || DATA.maxStamina;
+        this.player.skills = p.skills || {}; this.player.ownedSkins = new Set(p.ownedSkins || ['classic']); this.player.equippedSkin = p.equippedSkin || 'classic';
+        this.spec = data.spec || { points:0, levelsClaimed:0, tree:{ bulldozer:0, sprinter:0, firebreaker:0 } };
+        this.achievements = data.achievements || { quenched:0,rescued:0,megasKilled:0,firebreaksPlaced:0,wavesCleared:0,animalsLost:0 };
+        this.updateDerivedStats();
+        this.player.firebreakCharges = p.firebreakCharges || this.derived.firebreakChargesMax;
+        this.tiles.clear();
+        (data.world?.tiles || []).forEach(t => {
+            const tile = this._baseEnsureTile ? this._baseEnsureTile.call(this, t.q, t.r) : original.ensureTile.call(this, t.q, t.r);
+            if (!tile) return;
+            Object.assign(tile, t);
+            tile.x = this.axialToWorld(t.q, t.r).x;
+            tile.y = this.axialToWorld(t.q, t.r).y;
+        });
+        this.megaFires = data.world?.megaFires || [];
+        this.animals = data.world?.animals || [];
+        this.firebreaks = data.world?.firebreaks || [];
+        this.smokeClouds = data.world?.smokeClouds || [];
+        this.camera.x = this.player.x; this.camera.y = this.player.y;
+        this.exp.unlockedLevel = Math.max(this.exp.unlockedLevel, data.meta?.unlockedLevel || this.currentLevel);
+        this.exp.completedGame = !!(data.meta?.completedGame || this.exp.completedGame);
+        this.persistMetaProgress();
+        this.renderShop();
+        this.renderTalentPanel();
+        this.updateUI();
+        this.showToast(`Loaded Level ${this.currentLevel}`, this.getLevelName(this.currentLevel));
+    };
+    game.loadSaveFromJSON = function(file){
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                const data = JSON.parse(reader.result);
+                this.applySnapshot(data);
+                this.paused = false;
+                hideMenu();
+            } catch (e) {
+                alert('Save JSON se nepodařilo načíst.');
+                console.error(e);
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    game._baseEnsureTile = original.ensureTile;
+    game.ensureTile = function(q, r){
+        if (!this.isWorldTileInBounds(q, r)) return null;
+        const pos = this.axialToWorld(q, r);
+        const key = this.tileKey(q, r);
+        if (this.tiles.has(key)) return this.tiles.get(key);
+        const tile = this._baseEnsureTile.call(this, q, r);
+        if (!tile) return null;
+        tile.flammable = true;
+        tile.structure = tile.structure || null;
+        tile.variant = tile.variant || null;
+        tile.levelTag = this.currentLevel || 1;
+
+        const n = this.seedNoise(q, r, 0.17);
+        const n2 = this.seedNoise(q, r, 2.71);
+        const n3 = this.seedNoise(q, r, 4.21);
+        if ((this.currentLevel || 1) === 2) {
+            tile.biome = n > 0.86 ? 'oasis' : 'desert';
+            tile.type = n > 0.92 ? 'palm' : n2 > 0.78 ? 'dry_bush' : n3 > 0.93 ? 'dead_shrub' : 'sand';
+            tile.hasOasisWater = tile.biome === 'oasis' && n2 > 0.64 && n2 < 0.76;
+            tile.flammable = ['dry_bush','dead_shrub','palm'].includes(tile.type);
+            tile.bushHealth = tile.flammable ? 1 : 0;
+        } else if ((this.currentLevel || 1) === 3) {
+            tile.biome = n > 0.85 ? 'swamp' : 'jungle';
+            tile.type = n2 > 0.76 ? 'jungle_tree' : n3 > 0.7 ? 'vine' : n > 0.4 ? 'jungle_floor' : 'flowers';
+            tile.flammable = !['swamp'].includes(tile.biome);
+            tile.bushHealth = ['vine','jungle_tree'].includes(tile.type) ? 1 : tile.bushHealth;
+        } else if ((this.currentLevel || 1) === 4) {
+            tile.biome = 'warehouse';
+            const roadX = Math.abs(pos.x) < 34, roadY = Math.abs(pos.y) < 34;
+            tile.type = 'floor';
+            tile.flammable = false;
+            if (!roadX && !roadY && (Math.abs(pos.x) % 78 < 24 || Math.abs(pos.y) % 78 < 24)) {
+                if (n > 0.8) { tile.type = 'battery'; tile.battery = true; tile.flammable = true; tile.structure = 'battery'; }
+                else if (n2 > 0.56) { tile.type = 'crate'; tile.flammable = true; tile.structure = 'crate'; }
+                else { tile.type = 'shelf'; tile.flammable = true; tile.structure = 'shelf'; }
+                tile.bushHealth = 1;
+            }
+        } else if ((this.currentLevel || 1) === 5) {
+            tile.biome = 'city';
+            const bounds = this.getWorldTileBounds();
+            const rx = q - bounds.minQ;
+            const ry = r - bounds.minR;
+            const road = rx % 4 === 0 || ry % 4 === 0;
+            tile.road = road;
+            tile.flammable = false;
+            if (road) {
+                tile.type = n > 0.93 ? 'car' : 'road';
+                tile.flammable = tile.type === 'car';
+            } else {
+                if (n > 0.84) { tile.type = 'park'; tile.flammable = true; }
+                else if (n2 > 0.88) { tile.type = 'school'; tile.flammable = true; tile.structure = 'school'; }
+                else if (n3 > 0.86) { tile.type = 'parking'; tile.flammable = true; }
+                else { tile.type = 'building'; tile.flammable = true; tile.structure = 'building'; }
+            }
+        }
+        return tile;
+    };
+
+    game.updateMovement = function(dt){
+        const prevX = this.player.x, prevY = this.player.y;
+        original.updateMovement.call(this, dt);
+        const tile = this.worldToAxial(this.player.x, this.player.y);
+        if (!this.isWorldTileInBounds(tile.q, tile.r)) {
+            this.player.x = prevX;
+            this.player.y = prevY;
+            this.player.vx = 0;
+            this.player.vy = 0;
+        }
+    };
+
+    game.randomizeWind = function(force=false){
+        this.wind.angle = this.rand() * Math.PI * 2;
+        this.wind.strength = this.randRange(DATA.windStrengthMin, DATA.windStrengthMax);
+        this.wind.timer = DATA.windChangeInterval * this.randRange(0.7, 1.25);
+        if (!force) this.log(`Vítr se otočil. Směr ${Math.round((this.wind.angle * 180 / Math.PI + 360) % 360)}°`, 'coin');
+    };
+
+    game.createExplosion = function(x,y){
+        for (let i = 0; i < 16; i++) {
+            this.particles.push({ x, y, vx: this.randRange(-8,8), vy: this.randRange(-8,8), life: this.randRange(0.45,0.7), color: this.rand() > 0.5 ? '#ffdf5d' : '#ff7b72' });
+        }
+    };
+
+    game.generateBushesForWave = function(){
+        const level = this.currentLevel || 1;
+        const base = level === 4 ? 10 : level === 5 ? 18 : DATA.bushSpawnBase;
+        const needed = base + this.wave * (level === 2 ? 2 : level === 3 ? 4 : 3);
+        const center = this.worldToAxial(this.player.x, this.player.y);
+        let placed = 0, tries = 0;
+        while (placed < needed && tries < needed * 60) {
+            tries++;
+            const q = center.q + this.randInt(-14, 14);
+            const r = center.r + this.randInt(-14, 14);
+            const tile = this.ensureTile(q, r);
+            if (!tile || tile.type === 'tree' || tile.type === 'road') continue;
+            if (Math.hypot(tile.x, tile.y) < DATA.shopAuraRadius + 40) continue;
+            if (level === 1) {
+                if (tile.type !== 'bush') { tile.type = 'bush'; tile.bushHealth = 1; }
+                let fireChance = DATA.bushFireChance;
+                if (tile.biome === 'steppe') fireChance *= 1.25;
+                if (tile.biome === 'marsh') fireChance *= 0.72;
+                if (tile.fire <= 0 && this.rand() < fireChance) { tile.fire = 100; tile.burnTime = 0; }
+            } else if (level === 2) {
+                if (!['dry_bush','dead_shrub','palm'].includes(tile.type)) tile.type = this.rand() > 0.6 ? 'dry_bush' : 'dead_shrub';
+                tile.flammable = true; tile.bushHealth = 1;
+                if (tile.fire <= 0 && this.rand() < 0.46) { tile.fire = 100; tile.burnTime = 0; }
+            } else if (level === 3) {
+                if (!['vine','jungle_tree'].includes(tile.type)) tile.type = this.rand() > 0.55 ? 'vine' : 'jungle_tree';
+                tile.flammable = true; tile.bushHealth = 1;
+                if (tile.fire <= 0 && this.rand() < 0.34) { tile.fire = 100; tile.burnTime = 0; }
+            } else if (level === 4) {
+                if (!['battery','crate','shelf'].includes(tile.type)) tile.type = this.rand() > 0.6 ? 'crate' : 'shelf';
+                tile.flammable = true; tile.battery = tile.type === 'battery'; tile.bushHealth = 1;
+                if (tile.fire <= 0 && this.rand() < 0.38) { tile.fire = 100; tile.burnTime = 0; }
+            } else if (level === 5) {
+                if (tile.type === 'road') { if (this.rand() > 0.82) tile.type = 'car'; }
+                if (!['building','car','park','parking','school'].includes(tile.type)) tile.type = this.rand() > 0.45 ? 'building' : 'park';
+                tile.flammable = tile.type !== 'road'; tile.bushHealth = tile.flammable ? 1 : 0;
+                if (tile.fire <= 0 && tile.flammable && this.rand() < 0.30) { tile.fire = 100; tile.burnTime = 0; }
+            }
+            tile.generatedInWave = this.wave;
+            placed++;
+        }
+    };
+
+    game.spawnAnimalsForWave = function(){
+        const level = this.currentLevel || 1;
+        const amount = level === 4 ? 0 : DATA.animalSpawnBase + Math.floor(this.wave / 5) * DATA.animalSpawnPerFiveWaves + (level === 3 ? 2 : 0);
+        const types = level === 2 ? [
+            { id:'fennec', icon:'🦊', speed:112 },
+            { id:'camel', icon:'🐪', speed:86 },
+            { id:'scorpion', icon:'🦂', speed:120 }
+        ] : level === 3 ? [
+            { id:'elephant', icon:'🐘', speed:90, helper:true },
+            { id:'monkey', icon:'🐒', speed:130 },
+            { id:'bird', icon:'🦜', speed:140 }
+        ] : level === 5 ? [
+            { id:'citizen', icon:'🧑', speed:100 },
+            { id:'dog', icon:'🐕', speed:118 },
+            { id:'cat', icon:'🐈', speed:122 }
+        ] : ANIMAL_TYPES;
+        const center = this.worldToAxial(this.player.x, this.player.y);
+        for (let i = 0; i < amount; i++) {
+            const q = center.q + this.randInt(-10,10);
+            const r = center.r + this.randInt(-10,10);
+            const tile = this.ensureTile(q, r);
+            if (!tile || tile.type === 'tree' || tile.type === 'building') continue;
+            const type = types[Math.floor(this.rand() * types.length)];
+            this.animals.push({
+                id: 'a_' + Math.floor(this.rand() * 1e9),
+                x: tile.x + this.randRange(-18,18), y: tile.y + this.randRange(-18,18), vx:0, vy:0, type,
+                following:false, rescued:false, dead:false, timer:this.randRange(0,999),
+                cheering:0, helper:!!type.helper
+            });
+        }
+    };
+
+    game.spawnMegaFiresForWave = function(){
+        if (this.wave < DATA.megaFireStartWave) return;
+        if ((this.wave - DATA.megaFireStartWave) % DATA.megaFireWaveEvery !== 0) return;
+        const count = 1 + Math.floor(this.wave / 12) + ((this.currentLevel || 1) >= 4 ? 1 : 0);
+        const center = this.worldToAxial(this.player.x, this.player.y);
+        for (let i = 0; i < count; i++) {
+            const q = center.q + this.randInt(-9,9);
+            const r = center.r + this.randInt(-9,9);
+            const tile = this.ensureTile(q, r);
+            if (!tile) continue;
+            const hpBase = DATA.megaFireHpBase + this.wave * DATA.megaFireHpPerWave + ((this.currentLevel || 1) >= 4 ? 40 : 0);
+            this.megaFires.push({ x: tile.x, y: tile.y, hp: hpBase, maxHp: hpBase, radius: DATA.megaFireRadius + i * 6, timer: this.randRange(0.6,1.5), kind: this.currentLevel === 4 ? 'battery' : 'wild' });
+            this.log(this.currentLevel === 4 ? '💀 Battery core ignition!' : '💀 MegaFire se zrodil v divočině.', 'fire');
+        }
+    };
+
+    game.getRandomFireCandidates = function(){
+        const arr = [];
+        for (const tile of this.tiles.values()) {
+            if (!tile || tile.fire > 0 || this.isTileProtectedByFirebreak(tile)) continue;
+            if (Math.hypot(tile.x - this.player.x, tile.y - this.player.y) < 90) continue;
+            if (tile.flammable || ['bush','flowers','grass','grass2','dry_bush','dead_shrub','palm','vine','jungle_tree','crate','shelf','battery','building','park','school','parking','car'].includes(tile.type)) arr.push(tile);
+        }
+        return arr;
+    };
+
+    game.spawnFire = function(count){
+        const candidates = this.getRandomFireCandidates();
+        for (let i = 0; i < count && candidates.length > 0; i++) {
+            const index = Math.floor(this.rand() * candidates.length);
+            const tile = candidates.splice(index, 1)[0];
+            tile.fire = 100; tile.burnTime = 0;
+        }
+    };
+
+    game.updateMegaFires = function(dt){
+        const wind = this.windVec();
+        this.megaFires.forEach(m => {
+            m.timer -= dt;
+            if (this.rand() < DATA.smokeSpawnRate * 2.3 * dt * 60) {
+                this.smokeClouds.push({ x:m.x + this.randRange(-12,12), y:m.y + this.randRange(-12,12), vx: wind.x * (34 + this.wind.strength * 70), vy: wind.y * (34 + this.wind.strength * 70), radius: this.randRange(30,48), life: this.randRange(2.4,4.6), maxLife:1 });
+            }
+            if (m.timer <= 0) {
+                m.timer = DATA.megaFireSpawnFireInterval * this.randRange(0.7,1.2);
+                const src = this.worldToAxial(m.x, m.y);
+                const bursts = this.currentLevel === 4 ? 3 : 2;
+                for (let i = 0; i < bursts; i++) {
+                    const tile = this.ensureTile(src.q + this.randInt(-2,2), src.r + this.randInt(-2,2));
+                    if (tile && tile.flammable !== false && !this.isTileProtectedByFirebreak(tile)) { tile.fire = 100; tile.burnTime = 0; }
+                }
+            }
+        });
+    };
+
+    game.maybeSpreadFire = function(dt){
+        let activeFires = 0;
+        for (const tile of this.tiles.values()) if (tile && tile.fire > 0) activeFires++;
+        if (activeFires >= this.waveActiveFireCap) return;
+        const phase = this.getDayPhaseInfo();
+        let rate = Math.max(900, DATA.fireSpreadRateBase - this.wave * DATA.fireSpreadWaveAcceleration);
+        if (this.currentLevel === 2) rate *= 0.7;
+        if (this.currentLevel === 4) rate *= 0.8;
+        if (phase.label === 'Day') rate /= DATA.dayNightDayBonusSpread;
+        rate /= (1 + this.wind.strength * DATA.windSpreadMultiplier * 0.4);
+        this.lastSpawn += dt * 1000;
+        if (this.lastSpawn < rate) return;
+        this.lastSpawn = 0;
+        const burning = [...this.tiles.values()].filter(t => t && t.fire > 0);
+        if (!burning.length) { this.spawnFire(1); return; }
+        const src = burning[Math.floor(this.rand() * burning.length)];
+        const neighbors = [[1,0],[-1,0],[0,1],[0,-1],[1,-1],[-1,1]];
+        const wind = this.windVec();
+        const srcAx = this.worldToAxial(src.x, src.y);
+        let weighted = [];
+        neighbors.forEach(n => {
+            const tile = this.ensureTile(srcAx.q + n[0], srcAx.r + n[1]);
+            if (!tile || tile.fire > 0 || tile.flammable === false || this.isTileProtectedByFirebreak(tile)) return;
+            const dx = tile.x - src.x, dy = tile.y - src.y;
+            const dir = (dx * wind.x + dy * wind.y) / Math.max(1, Math.hypot(dx, dy));
+            let chance = ['bush','dry_bush','dead_shrub','vine','park'].includes(tile.type) ? 0.8 : ['battery','car'].includes(tile.type) ? 0.92 : 0.32;
+            if (tile.biome === 'desert') chance *= 1.35;
+            if (tile.biome === 'jungle') chance *= 1.12;
+            if (tile.biome === 'warehouse') chance *= 1.22;
+            chance *= 1 + Math.max(0, dir) * this.wind.strength * DATA.windSpreadMultiplier;
+            weighted.push({ tile, chance });
+        });
+        weighted.sort((a,b) => b.chance - a.chance);
+        for (const option of weighted) {
+            if (this.rand() < option.chance) {
+                option.tile.fire = 100; option.tile.burnTime = 0;
+                if (this.currentLevel === 4 && option.tile.battery && this.rand() < 0.35) {
+                    this.createExplosion(option.tile.x, option.tile.y);
+                    this.megaFires.push({ x: option.tile.x, y: option.tile.y, hp: 90 + this.wave * 8, maxHp: 90 + this.wave * 8, radius: 58, timer: this.randRange(0.5, 1.0), kind:'battery' });
+                }
+                break;
+            }
+        }
+    };
+
+    game.updateAnimals = function(dt){
+        if (this.currentLevel !== 3) return original.updateAnimals.call(this, dt);
+        let elephantSuccess = false;
+        this.animals.forEach(a => {
+            if (a.dead || a.rescued) return;
+            a.timer += dt;
+            const fire = this.nearestFireInfo(a.x, a.y);
+            if (a.helper) {
+                if (fire) {
+                    const dx = fire.x - a.x, dy = fire.y - a.y, len = Math.hypot(dx, dy) || 1;
+                    a.vx = dx / len * a.type.speed; a.vy = dy / len * a.type.speed;
+                    a.x += a.vx * dt; a.y += a.vy * dt;
+                    if (fire.d < 36) {
+                        const ax = this.worldToAxial(fire.x, fire.y);
+                        for (let dq = -1; dq <= 1; dq++) for (let dr = -1; dr <= 1; dr++) {
+                            const tile = this.ensureTile(ax.q + dq, ax.r + dr);
+                            if (tile && tile.fire > 0) { tile.fire = 0; tile.scorch = Math.max(tile.scorch, 0.18); elephantSuccess = true; this.waveProgress = Math.min(this.waveTarget, this.waveProgress + 1); }
+                        }
+                        this.particles.push({ x:a.x, y:a.y, vx:0, vy:-2, life:0.8, color:'#79c0ff' });
+                    }
+                }
+            } else {
+                if (elephantSuccess || a.cheering > 0) {
+                    a.cheering = Math.max(0, a.cheering - dt);
+                    a.vx = Math.cos(a.timer * 10) * a.type.speed * 0.55;
+                    a.vy = Math.sin(a.timer * 10) * a.type.speed * 0.55;
+                    a.x += a.vx * dt; a.y += a.vy * dt;
+                } else if (fire && fire.d < 220) {
+                    const dx = (a.x - fire.x), dy = (a.y - fire.y), len = Math.hypot(dx,dy) || 1;
+                    a.vx = dx / len * a.type.speed * 1.2; a.vy = dy / len * a.type.speed * 1.2;
+                    a.x += a.vx * dt; a.y += a.vy * dt;
+                } else {
+                    a.vx = Math.cos(a.timer * 0.8 + a.x * 0.01) * a.type.speed * 0.45;
+                    a.vy = Math.sin(a.timer * 0.8 + a.y * 0.01) * a.type.speed * 0.45;
+                    a.x += a.vx * dt; a.y += a.vy * dt;
+                }
+            }
+            const animalTile = this.worldToAxial(a.x, a.y);
+            if (!this.isWorldTileInBounds(animalTile.q, animalTile.r)) {
+                a.x = clamp(a.x, -DATA.hexSize * 12, DATA.hexSize * 12);
+                a.y = clamp(a.y, -DATA.hexSize * 12, DATA.hexSize * 12);
+                a.vx *= -0.2;
+                a.vy *= -0.2;
+            }
+        });
+        if (elephantSuccess) {
+            this.exp.lastElephantCheer = 1.4;
+            this.animals.forEach(a => { if (!a.helper) a.cheering = 1.4; });
+            this.log('🐘 Slon uhasil oheň, džungle jásá a rozbíhá se dál.', 'heal');
+        }
+        this.exp.lastElephantCheer = Math.max(0, this.exp.lastElephantCheer - dt);
+    };
+
+    game.endWave = function(){
+        const previousLevel = this.currentLevel || 1;
+        original.endWave.call(this);
+        const computed = this.getCurrentLevelFromWave();
+        if (computed > EXP.totalLevels) {
+            this.currentLevel = EXP.totalLevels;
+            this.exp.completedGame = true;
+            this.exp.unlockedLevel = EXP.totalLevels;
+            this.persistMetaProgress();
+            this.paused = true;
+            showMenu();
+            this.showToast('Run complete', 'Všechny levely dohrány');
+            return;
+        }
+        if (computed !== previousLevel) {
+            this.currentLevel = computed;
+            this.exp.unlockedLevel = Math.max(this.exp.unlockedLevel, computed);
+            this.persistMetaProgress();
+            this.resetWorldState();
+            this.timer = DATA.cooldownTime + 3;
+            this.showToast(`Level ${computed}`, this.getLevelName(computed));
+            this.log(`➡️ Postup do ${this.getLevelName(computed)}.`, 'coin');
+        }
+    };
+
+    game.render = function(){
+        const ctx = this.ctx; ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+        if (this.currentLevel === 4) {
+            ctx.fillStyle = '#181f25';
+            ctx.fillRect(0,0,this.canvas.width,this.canvas.height);
+        } else if (this.currentLevel === 2) {
+            ctx.fillStyle = '#8d6e32';
+            ctx.fillRect(0,0,this.canvas.width,this.canvas.height);
+        } else if (this.currentLevel === 5) {
+            ctx.fillStyle = '#22272f';
+            ctx.fillRect(0,0,this.canvas.width,this.canvas.height);
+        }
+        const centerHex = this.worldToAxial(this.camera.x, this.camera.y); const renderTiles = [];
+        for (let dq = -DATA.renderTileRadius; dq <= DATA.renderTileRadius; dq++) {
+            for (let dr = -DATA.renderTileRadius; dr <= DATA.renderTileRadius; dr++) {
+                const q = centerHex.q + dq, r = centerHex.r + dr;
+                const dist = Math.max(Math.abs(dq), Math.abs(dr), Math.abs(-dq-dr));
+                if (dist > DATA.renderTileRadius) continue;
+                const tile = this.ensureTile(q, r);
+                if (tile) renderTiles.push(tile);
+            }
+        }
+        renderTiles.sort((a, b) => (a.x + a.y) - (b.x + b.y));
+        for (const tile of renderTiles) this.drawIsoTile(tile);
+        for (const cloud of this.smokeClouds.slice(-DATA.maxSmokeRender)) if (Math.abs(cloud.x - this.camera.x) < 640 && Math.abs(cloud.y - this.camera.y) < 640) this.drawSmoke(cloud);
+        for (const breakObj of this.firebreaks) this.drawFirebreak(breakObj);
+        for (const ring of this.rings) this.drawRing(ring);
+        this.drawCenterTree();
+        this.megaFires.forEach(m => this.drawMegaFire(m));
+        this.animals.forEach(a => this.drawAnimal(a));
+        this.drawElephant(this.player.x, this.player.y);
+        this.particles.slice(-DATA.maxParticles).forEach(p => { if (Math.abs(p.x - this.camera.x) > 640 || Math.abs(p.y - this.camera.y) > 640) return; const pos = this.project(p.x, p.y); ctx.globalAlpha = Math.max(0, p.life * 1.6); ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(pos.x, pos.y, 3, 0, Math.PI * 2); ctx.fill(); });
+        ctx.globalAlpha = 1;
+        if (this.currentLevel === 2) {
+            ctx.fillStyle = 'rgba(235, 196, 113, 0.06)';
+            for (let i = 0; i < 40; i++) ctx.fillRect((i * 137 + this.totalTime * 40) % this.canvas.width, (i * 53) % this.canvas.height, 2, 10);
+        }
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        const worldBounds = this.getWorldPixelBounds();
+        const [cornerA, cornerB, cornerC, cornerD] = worldBounds.corners;
+        const a = this.project(cornerA.x, cornerA.y), b = this.project(cornerB.x, cornerB.y), c = this.project(cornerC.x, cornerC.y), d = this.project(cornerD.x, cornerD.y);
+        ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.lineTo(c.x,c.y); ctx.lineTo(d.x,d.y); ctx.closePath(); ctx.stroke();
+    };
+
+    game.drawCenterTree = function(){
+        const p = this.project(0,0); const ctx = this.ctx;
+        if (this.currentLevel === 4) {
+            ctx.fillStyle = 'rgba(88,166,255,0.16)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 12, 190, 96, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.font = '48px Arial'; ctx.textAlign = 'center'; ctx.fillText('🚒', p.x, p.y + 14);
+        } else if (this.currentLevel === 5) {
+            ctx.fillStyle = 'rgba(88,166,255,0.16)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 12, 190, 96, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.font = '48px Arial'; ctx.textAlign = 'center'; ctx.fillText('🏛️', p.x, p.y + 14);
+        } else if (this.currentLevel === 2) {
+            ctx.fillStyle = 'rgba(72,164,190,0.18)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 12, 190, 96, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.font = '54px Arial'; ctx.textAlign = 'center'; ctx.fillText('🏝️', p.x, p.y + 18);
+        } else {
+            original.drawCenterTree.call(this);
+        }
+    };
+
+    game.drawAnimal = function(a){
+        if (a.dead || a.rescued) return;
+        const ctx = this.ctx; const p = this.project(a.x, a.y); ctx.textAlign = 'center';
+        ctx.font = a.helper ? '28px Arial' : '18px Arial';
+        ctx.fillText(a.type.icon, p.x, p.y);
+        if (this.currentLevel === 3 && a.helper) {
+            ctx.font = '10px Arial'; ctx.fillStyle = '#9fd6ff'; ctx.fillText('spray', p.x, p.y - 18); ctx.fillStyle = '#ffffff';
+        }
+        if (a.cheering > 0) { ctx.font = '12px Arial'; ctx.fillText('✨', p.x + 12, p.y - 10); }
+    };
+
+    game.drawIsoTile = function(tile){
+        const ctx = this.ctx; const p = this.project(tile.x, tile.y); const hw = DATA.hexSize * 0.9; const hh = DATA.hexSize * 0.46;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y - hh); ctx.lineTo(p.x + hw, p.y); ctx.lineTo(p.x, p.y + hh); ctx.lineTo(p.x - hw, p.y); ctx.closePath();
+        let fill = '#67b84f';
+        if (this.currentLevel === 2) {
+            fill = tile.biome === 'oasis' ? '#5fae73' : '#c9aa57';
+            if (tile.type === 'sand') fill = '#cfb164';
+            if (tile.type === 'dry_bush') fill = '#8a783d';
+            if (tile.type === 'dead_shrub') fill = '#6e6237';
+            if (tile.type === 'palm') fill = '#6d9c48';
+            if (tile.hasOasisWater) fill = '#4e9fc3';
+        } else if (this.currentLevel === 3) {
+            fill = tile.biome === 'swamp' ? '#3d7b63' : '#3c9650';
+            if (tile.type === 'jungle_tree') fill = '#2c7e38';
+            if (tile.type === 'vine') fill = '#4aa85a';
+            if (tile.type === 'jungle_floor') fill = '#4f8d42';
+        } else if (this.currentLevel === 4) {
+            fill = '#434d58';
+            if (tile.type === 'shelf') fill = '#58636f';
+            if (tile.type === 'crate') fill = '#8a6b44';
+            if (tile.type === 'battery') fill = '#4d5872';
+        } else if (this.currentLevel === 5) {
+            fill = '#4d5561';
+            if (tile.type === 'road') fill = '#2f343b';
+            if (tile.type === 'building') fill = '#687180';
+            if (tile.type === 'school') fill = '#8d7aa5';
+            if (tile.type === 'parking') fill = '#596270';
+            if (tile.type === 'park') fill = '#4f8e53';
+            if (tile.type === 'car') fill = '#a85f5f';
+        } else {
+            if (tile.biome === 'forest') fill = '#59a845';
+            else if (tile.biome === 'steppe') fill = '#92b24b';
+            else if (tile.biome === 'marsh') fill = '#5a8f63';
+            if (tile.type === 'tree') fill = '#5aa043';
+            else if (tile.type === 'grass2') fill = tile.biome === 'steppe' ? '#a4b84a' : '#60ab46';
+            else if (tile.type === 'flowers') fill = tile.biome === 'meadow' ? '#74c65a' : '#6abf73';
+            else if (tile.type === 'bush') fill = tile.biome === 'steppe' ? '#7d9240' : '#5ea447';
+        }
+        if (tile.scorch > 0) {
+            const s = tile.scorch; const r = Math.round(103 * (1 - s) + 77 * s); const g = Math.round(184 * (1 - s) + 66 * s); const b = Math.round(79 * (1 - s) + 36 * s); fill = `rgb(${r},${g},${b})`;
+        }
+        ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = 'rgba(18,39,15,0.24)'; ctx.lineWidth = 1; ctx.stroke();
+        if (['bush','dry_bush','dead_shrub','vine'].includes(tile.type)) this.drawBush(tile, p);
+        if (tile.type === 'palm') { ctx.fillStyle = '#6b9f47'; ctx.font = '20px Arial'; ctx.fillText('🌴', p.x, p.y + 6); }
+        if (tile.type === 'jungle_tree') { ctx.font = '20px Arial'; ctx.fillText('🌴', p.x, p.y + 6); }
+        if (tile.type === 'battery') { ctx.font = '18px Arial'; ctx.fillText('🔋', p.x, p.y + 4); }
+        if (tile.type === 'crate') { ctx.font = '18px Arial'; ctx.fillText('📦', p.x, p.y + 4); }
+        if (tile.type === 'shelf') { ctx.font = '18px Arial'; ctx.fillText('🗄️', p.x, p.y + 4); }
+        if (tile.type === 'building') { ctx.font = '18px Arial'; ctx.fillText('🏢', p.x, p.y + 4); }
+        if (tile.type === 'school') { ctx.font = '18px Arial'; ctx.fillText('🏫', p.x, p.y + 4); }
+        if (tile.type === 'parking') { ctx.font = '18px Arial'; ctx.fillText('🅿️', p.x, p.y + 4); }
+        if (tile.type === 'car') { ctx.font = '18px Arial'; ctx.fillText('🚗', p.x, p.y + 4); }
+        if (tile.type === 'park' && tile.fire <= 0) { ctx.font = '18px Arial'; ctx.fillText('🌳', p.x, p.y + 4); }
+        if (tile.type === 'flowers' && tile.fire <= 0) { ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.beginPath(); ctx.arc(p.x + 7, p.y - 4, 2, 0, Math.PI * 2); ctx.arc(p.x - 5, p.y + 1, 2, 0, Math.PI * 2); ctx.fill(); }
+        if (tile.fire > 0) this.drawFire(tile, p);
+    };
+
+    game.renderShop = function(){
+        original.renderShop.call(this);
+        const shop = document.getElementById('shop');
+        const metaCard = document.createElement('div');
+        metaCard.className = 'shop-item';
+        metaCard.innerHTML = `<div class="shop-item-top"><strong>Run meta</strong><span class="mini">Level ${this.currentLevel || 1}</span></div><small class="mini">Seed ${this.seed || '-'} • Wave ${this.wave} • map ${EXP.worldTiles}×${EXP.worldTiles} polí</small>`;
+        const row = document.createElement('div');
+        row.style.display = 'flex'; row.style.gap = '8px'; row.style.flexWrap = 'wrap';
+        const b1 = document.createElement('button'); b1.className = 'btn'; b1.textContent = 'Export'; b1.onclick = () => this.exportSaveToJSON();
+        const b2 = document.createElement('button'); b2.className = 'btn'; b2.textContent = 'Menu'; b2.onclick = () => { this.paused = true; showMenu(); };
+        const b3 = document.createElement('button'); b3.className = 'btn btn-primary'; b3.textContent = 'Free spin'; b3.onclick = () => this.spinFateWheel(true);
+        row.appendChild(b1); row.appendChild(b2); row.appendChild(b3); metaCard.appendChild(row);
+
+        const fate = document.createElement('div');
+        fate.className = 'shop-item';
+        fate.innerHTML = `<div class="shop-item-top"><strong>🎡 Kolo osudu</strong><span class="mini">${Math.ceil(this.fateWheel?.timer || 0)} s</span></div><small class="mini">Běží samo a zdarma. Umí dát buff, prokletí i coinový jackpot/malus.</small><div class="hint-line">Poslední spin: ${this.fateWheel?.lastResult || 'Čeká na první spin'}</div>`;
+        shop.appendChild(fate);
+        shop.appendChild(metaCard);
+    };
+
+    game.updateUI = function(){
+        original.updateUI.call(this);
+        document.getElementById('wave-title').innerText = this.gameState === 'COOLDOWN' ? `LEVEL ${this.currentLevel || 1} • COOLDOWN` : `LEVEL ${this.currentLevel || 1} • WAVE ${this.wave}`;
+        document.getElementById('biome-readout').innerText = `${this.getLevelName(this.currentLevel || 1)} / ${this.ensureTile(this.worldToAxial(this.player.x, this.player.y).q, this.worldToAxial(this.player.x, this.player.y).r)?.biome || '-'}`;
+        document.getElementById('seed-btn').textContent = `Seed ${this.seed}`;
+        this.updateChestPreview();
+    };
+
+    function buildLevelButtons(){
+        const box = document.getElementById('level-select-box');
+        box.innerHTML = '';
+        const unlocked = game.exp.completedGame ? 5 : game.exp.unlockedLevel;
+        for (let i = 1; i <= 5; i++) {
+            const btn = document.createElement('button');
+            btn.className = 'btn';
+            btn.textContent = `${i}. ${game.getLevelName(i)}`;
+            btn.disabled = i > unlocked;
+            btn.onclick = () => {
+                const seed = game.exp.selectedSeed || game.seed || (Date.now().toString(36));
+                game.resetRunState(seed, i);
+                game.paused = false;
+                hideMenu();
+            };
+            box.appendChild(btn);
+        }
+    }
+
+    function refreshMenu(){
+        document.getElementById('menu-seed').textContent = game.seed || game.exp.selectedSeed || '-';
+        document.getElementById('progress-readout').textContent = `Unlocked level: ${game.exp.unlockedLevel}${game.exp.completedGame ? ' • game completed' : ''}`;
+        buildLevelButtons();
+    }
+    function showMenu(){ refreshMenu(); menu.style.display = 'flex'; }
+    function hideMenu(){ menu.style.display = 'none'; }
+
+    document.getElementById('menu-btn').onclick = () => { game.paused = true; showMenu(); };
+    document.getElementById('save-btn').onclick = () => game.exportSaveToJSON();
+    document.getElementById('import-btn').onclick = () => document.getElementById('import-file').click();
+    document.getElementById('menu-import-btn').onclick = () => document.getElementById('import-file').click();
+    document.getElementById('import-file').addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) game.loadSaveFromJSON(file);
+        e.target.value = '';
+    });
+    document.getElementById('seed-btn').onclick = () => alert(`Aktivní seed: ${game.seed}`);
+    document.getElementById('new-game-btn').onclick = () => {
+        const seed = prompt('Zadej seed nebo nech prázdné pro náhodný:', game.exp.selectedSeed || game.seed || '');
+        const finalSeed = seed && seed.trim() ? seed.trim() : `seed-${Math.random().toString(36).slice(2,10)}`;
+        game.exp.selectedSeed = finalSeed;
+        game.resetRunState(finalSeed, 1);
+        game.paused = false;
+        hideMenu();
+    };
+    document.getElementById('continue-btn').onclick = () => { game.paused = false; hideMenu(); };
+
+    game.loadMetaProgress();
+    game.resetRunState(game.exp.selectedSeed || `seed-${Math.random().toString(36).slice(2,10)}`, 1);
+    game.paused = true;
+    refreshMenu();
+    showMenu();
+
+    // --- UX/performance patch: animated wheel, full-grid minimap, smaller world ---
+    game.renderMinimap = function(){
+        if (!this.ui.minimapOpen) return;
+        const ctx = this.minimapCtx;
+        const w = this.minimapCanvas.width, h = this.minimapCanvas.height;
+        const bounds = this.getWorldTileBounds();
+        const cols = bounds.maxQ - bounds.minQ + 1;
+        const rows = bounds.maxR - bounds.minR + 1;
+        const pad = 10;
+        const cell = Math.floor(Math.min((w - pad * 2) / cols, (h - pad * 2) / rows));
+        const gridW = cell * cols, gridH = cell * rows;
+        const ox = Math.floor((w - gridW) / 2), oy = Math.floor((h - gridH) / 2);
+
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = 'rgba(8,15,12,0.96)';
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.strokeRect(ox - 2, oy - 2, gridW + 4, gridH + 4);
+
+        for (let q = bounds.minQ; q <= bounds.maxQ; q++) {
+            for (let r = bounds.minR; r <= bounds.maxR; r++) {
+                const x = ox + (q - bounds.minQ) * cell;
+                const y = oy + (r - bounds.minR) * cell;
+                const tile = this.ensureTile(q, r);
+                let fill = 'rgba(62,97,57,0.95)';
+                if (tile) {
+                    if (tile.type === 'tree') fill = '#3fb950';
+                    else if (tile.type === 'road') fill = '#6a727d';
+                    else if (tile.type === 'building') fill = '#8b949e';
+                    else if (tile.type === 'park') fill = '#57a85a';
+                    else if (tile.type === 'battery') fill = '#f2cc60';
+                    else if (tile.type === 'crate' || tile.type === 'shelf') fill = '#a87844';
+                    else if (tile.biome === 'desert') fill = '#9a7a38';
+                    else if (tile.biome === 'jungle') fill = '#2e8b57';
+                    else if (tile.biome === 'warehouse') fill = '#444b53';
+                    else if (tile.biome === 'city') fill = '#56606c';
+                    else if (tile.type === 'bush' || tile.type === 'dry_bush' || tile.type === 'vine' || tile.type === 'jungle_tree') fill = '#6ea24c';
+                    if (tile.fire > 0) fill = '#ff7b72';
+                }
+                ctx.fillStyle = fill;
+                ctx.fillRect(x, y, cell - 1, cell - 1);
+            }
+        }
+
+        const drawDot = (q, r, color, size=0.32) => {
+            if (!this.isWorldTileInBounds(q, r)) return;
+            const x = ox + (q - bounds.minQ + 0.5) * cell;
+            const y = oy + (r - bounds.minR + 0.5) * cell;
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(x, y, Math.max(2, cell * size), 0, Math.PI * 2);
+            ctx.fill();
+        };
+
+        drawDot(0, 0, '#3fb950', 0.26);
+        const pHex = this.worldToAxial(this.player.x, this.player.y);
+        drawDot(pHex.q, pHex.r, '#f2cc60', 0.3);
+        this.megaFires.forEach(m => { const a = this.worldToAxial(m.x, m.y); drawDot(a.q, a.r, '#d2a8ff', 0.24); });
+        this.animals.forEach(a => { if (a.dead || a.rescued) return; const t = this.worldToAxial(a.x, a.y); drawDot(t.q, t.r, '#ffffff', 0.16); });
+
+        ctx.fillStyle = '#58a6ff';
+        ctx.font = '11px Segoe UI, sans-serif';
+        ctx.fillText('16×16 svět', 12, 16);
+    };
+
+    const wheelEl = document.getElementById('fortune-wheel');
+    const wheelLabelEl = document.getElementById('wheel-last-result');
+    game.fateWheel = Object.assign(game.fateWheel || {}, { angle: 0, spinning: false, lastIndex: 0, lastResult: (game.fateWheel && game.fateWheel.lastResult) || 'Čeká na první spin' });
+
+    function wheelSegments() {
+        return (typeof FATE_WHEEL !== 'undefined' && Array.isArray(FATE_WHEEL) && FATE_WHEEL.length) ? FATE_WHEEL : [];
+    }
+    function renderWheelLabels() {
+        if (!wheelEl) return;
+        const segments = wheelSegments();
+        const step = 360 / Math.max(1, segments.length);
+        wheelEl.innerHTML = segments.map((seg, i) => {
+            const angle = i * step + step / 2;
+            const shortLabel = seg.label.replace(/\s*[+-]?\d+\s*coinů?/i, m => m.replace(' coinů','')).replace(/\s*\+1/g,'');
+            return `<div style="position:absolute;left:50%;top:50%;width:96px;transform:translate(-50%,-50%) rotate(${angle}deg) translateY(-88px);transform-origin:center center;text-align:center;font:700 11px/1.1 Segoe UI,sans-serif;color:#08121f;text-shadow:0 1px 0 rgba(255,255,255,0.28);pointer-events:none;">${shortLabel}</div>`;
+        }).join('');
+    }
+    renderWheelLabels();
+
+    game.updateChestPreview = function(){
+        if (wheelLabelEl) wheelLabelEl.innerText = this.fateWheel?.lastResult || 'Čeká na první spin';
+    };
+
+    game.openChest = function(){
+        this.paused = true;
+        this.pendingChest = true;
+        this.updateChestPreview();
+        document.getElementById('overlay-chest').style.display = 'flex';
+    };
+    game.closeChest = function(){
+        document.getElementById('overlay-chest').style.display = 'none';
+        this.paused = false;
+        this.pendingChest = false;
+    };
+
+    game.animateFateWheel = function(result, source='manual'){
+        const segments = wheelSegments();
+        if (!segments.length || !wheelEl) {
+            this.applyFateOutcome(result, source);
+            if (source === 'manual' && this.pendingChest) this.closeChest();
+            return;
+        }
+        const idx = Math.max(0, segments.findIndex(s => s.label === result.label && s.type === result.type && s.amount === result.amount && s.id === result.id));
+        const step = 360 / segments.length;
+        const centerAngle = idx * step + step / 2;
+        const targetAngle = 360 - centerAngle;
+        const extraTurns = 1800 + Math.round(Math.random() * 540);
+        this.fateWheel.angle = (this.fateWheel.angle || 0) + extraTurns + targetAngle;
+        this.fateWheel.lastIndex = idx;
+        this.fateWheel.spinning = true;
+        wheelEl.style.transform = `rotate(${this.fateWheel.angle}deg)`;
+        clearTimeout(this.fateWheel.resolveTimer);
+        this.updateChestPreview();
+        this.fateWheel.resolveTimer = setTimeout(() => {
+            this.fateWheel.spinning = false;
+            this.applyFateOutcome(result, source);
+            if (source === 'manual' && this.pendingChest) this.closeChest();
+        }, source === 'auto' ? 2400 : 4000);
+    };
+
+    game.spinFateWheel = function(forceOpen=false){
+        if (this.fateWheel.spinning) return;
+        const result = this.weightedChestRoll();
+        this.fateWheel.timer = DATA.autoWheelInterval;
+        if (forceOpen && !this.pendingChest) {
+            document.getElementById('overlay-chest').style.display = 'flex';
+        }
+        this.animateFateWheel(result, forceOpen ? 'manual' : 'auto');
+    };
+
+    const rollBtn = document.getElementById('roll-chest-btn');
+    if (rollBtn) {
+        rollBtn.onclick = () => game.spinFateWheel(true);
+    }
+
+    game.ui.minimapOpen = true;
+    document.getElementById('minimap-panel').style.display = 'block';
+    const mapBtn = document.getElementById('toggle-minimap-btn');
+    if (mapBtn) mapBtn.classList.add('btn-active');
+    const mapHint = document.querySelector('#minimap-panel .hud-body');
+    if (mapHint && !mapHint.querySelector('.map-caption')) {
+        const p = document.createElement('div');
+        p.className = 'map-caption';
+        p.textContent = 'Mapa teď ukazuje celý 16×16 svět jako přehlednou mřížku. Žlutý bod = hráč, zelený = základna.';
+        mapHint.appendChild(p);
+    }
+
+    const oldResetRunState = game.resetRunState;
+    game.resetRunState = function(seed, startingLevel=1){
+        oldResetRunState.call(this, seed, startingLevel);
+        this.player.x = -90;
+        this.player.y = 0;
+        this.camera.x = this.player.x;
+        this.camera.y = this.player.y;
+        this.ensureTerrainAround(this.player.x, this.player.y, DATA.renderTileRadius + 3);
+    };
+
+})();
+</script>
+
+</body>
+</html>
